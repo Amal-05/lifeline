@@ -1,0 +1,11 @@
+"""M0 worker process placeholder; M2 adds asynchronous triage jobs."""
+import time
+
+
+def main() -> None:
+    while True:
+        time.sleep(60)
+
+
+if __name__ == "__main__":
+    main()

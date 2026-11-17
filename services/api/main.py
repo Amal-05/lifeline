@@ -1,0 +1,107 @@
+import json
+from contextlib import asynccontextmanager
+from datetime import UTC, datetime
+from typing import Any
+
+from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+from sqlalchemy import select
+
+from packages.protocol.python.lifeline_protocol import SyncBundle, verify_event
+from services.api.db import Base, SessionLocal, engine
+from services.api.models import EventRecord
+
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    Base.metadata.create_all(engine)
+    yield
+
+
+app = FastAPI(title="Lifeline API", version="1.0.0", lifespan=lifespan)
+app.add_middleware(CORSMiddleware, allow_origins=["http://localhost:4173", "http://127.0.0.1:4173"], allow_methods=["GET", "POST", "OPTIONS"], allow_headers=["content-type"])
+API_PREFIX = "/api/v1"
+
+
+class MediaAck(BaseModel):
+    media_id: str
+    status: str = "received"
+
+
+class SyncResponse(BaseModel):
+    accepted_ids: list[str]
+    rejected: list[dict[str, str]]
+    missing_events: list[dict[str, Any]]
+
+
+def media_id_from_bytes(content: bytes) -> str:
+    import hashlib
+    return hashlib.sha256(content).hexdigest()[:26].upper()
+
+
+@app.get("/health")
+def health() -> dict[str, str]:
+    return {"status": "ok"}
+
+
+@app.post(f"{API_PREFIX}/sync", response_model=SyncResponse)
+def sync(bundle: SyncBundle) -> SyncResponse:
+    accepted: list[str] = []
+    rejected: list[dict[str, str]] = []
+    with SessionLocal() as session:
+        for event in bundle.events:
+            try:
+                verify_event(event)
+            except ValueError as exc:
+                rejected.append({"event_id": event.event_id, "reason": str(exc)})
+                continue
+            if session.get(EventRecord, event.event_id) is None:
+                session.add(EventRecord(
+                    event_id=event.event_id, device_id=event.device_id, hlc=event.hlc,
+                    event_type=event.type, request_id=event.request_id,
+                    payload=json.dumps(event.payload, sort_keys=True, separators=(",", ":")),
+                    hops=event.hops, signature=event.signature,
+                ))
+            accepted.append(event.event_id)
+        session.commit()
+        known = set(bundle.known_event_ids) | {event.event_id for event in bundle.events if event.event_id in accepted}
+        missing = session.scalars(select(EventRecord).where(~EventRecord.event_id.in_(known))).all() if known else session.scalars(select(EventRecord)).all()
+        missing_events = [
+            {"protocol_version": 1, "event_id": row.event_id, "device_id": row.device_id,
+             "hlc": row.hlc, "type": row.event_type, "request_id": row.request_id,
+             "payload": json.loads(row.payload), "hops": row.hops, "signature": row.signature}
+            for row in missing
+        ]
+    return SyncResponse(accepted_ids=accepted, rejected=rejected, missing_events=missing_events)
+
+
+@app.get(f"{API_PREFIX}/sync/summary")
+def sync_summary() -> dict[str, Any]:
+    with SessionLocal() as session:
+        rows = session.scalars(select(EventRecord.hlc)).all()
+    return {"event_count": len(rows), "highest_hlc": max(rows, default=None)}
+
+
+@app.post(f"{API_PREFIX}/media", response_model=MediaAck)
+async def upload_media(file: UploadFile = File(...)) -> MediaAck:  # noqa: B008
+    content = await file.read(10 * 1024 * 1024 + 1)
+    if len(content) > 10 * 1024 * 1024:
+        raise HTTPException(status_code=413, detail="Media exceeds 10 MiB limit")
+    if not content:
+        raise HTTPException(status_code=400, detail="Empty media is not accepted")
+    return MediaAck(media_id=media_id_from_bytes(content))
+
+
+@app.get(f"{API_PREFIX}/requests/{{request_id}}/status")
+def request_status(request_id: str) -> dict[str, str]:
+    with SessionLocal() as session:
+        event = session.scalar(select(EventRecord).where(EventRecord.request_id == request_id).order_by(EventRecord.hlc.desc()))
+    if event is None:
+        raise HTTPException(status_code=404, detail="Request not found")
+    return {"request_id": request_id, "status": "received", "updated_hlc": event.hlc}
+
+
+@app.get(f"{API_PREFIX}/config")
+def config() -> dict[str, Any]:
+    return {"language_bundles_version": "1", "map_tile_urls": [], "feature_flags": {"offline_sos": True}, "server_time": datetime.now(UTC)}
