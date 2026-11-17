@@ -17,7 +17,7 @@ Copy-Item .env.example .env
 docker compose -f infra/docker-compose.yml up --build
 ```
 
-Open the field client at http://localhost:4173 and the API schema at http://localhost:8000/docs. For local development without Docker, install Python dependencies with `python -m pip install -r requirements.lock` followed by `python -m pip install --no-deps -e .`, install JavaScript dependencies with `npm ci`, start the API with `uvicorn services.api.main:app --reload`, and start Vite with `npm run dev --workspace @lifeline/web`.
+Open the field client at http://localhost:4173 and the API schema at http://localhost:8000/docs. For local development without Docker, install Python dependencies with `python -m pip install -r requirements.lock` followed by `python -m pip install --no-deps -e .`, install JavaScript dependencies with `npm install --include=optional`, start the API with `uvicorn services.api.main:app --reload`, and start Vite with `npm run dev --workspace @lifeline/web`.
 
 ## Checks
 

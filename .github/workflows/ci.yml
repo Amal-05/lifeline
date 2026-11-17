@@ -11,7 +11,8 @@ jobs:
         with: {node-version: '26.13.0', cache: npm}
       - run: python -m pip install -r requirements.lock
       - run: python -m pip install --no-build-isolation --no-deps -e .
-      - run: npm ci
+      # Hydrate platform-specific optional packages for the Linux runner.
+      - run: npm install --include=optional --no-audit --no-fund
       - run: pip-audit -r requirements.lock
       - run: npm audit --audit-level=moderate
       - run: python -m ruff check .

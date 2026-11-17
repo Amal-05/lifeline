@@ -10,3 +10,4 @@
 - 2026-11-17: Docker is unavailable in this environment; Compose can be authored but its start-up acceptance cannot be demonstrated here.
 - 2026-11-17: The package registry was initially unreachable in the restricted shell. Package installation succeeded after using the approved package-manager path, and both npm and Python lockfiles are generated from exact pins.
 - 2026-11-17: A deterministic generated-set fallback keeps local protocol-law tests usable if Hypothesis cannot be installed; CI installs Hypothesis and runs its property-based cases.
+- 2026-11-17: Docker's npm 11 clean install rejected a lock generated on Windows because it omitted foreign-platform optional packages (Lightning CSS and Rolldown). Use lockfile-aware `npm install --include=optional` in Linux image builds and CI to materialize the platform packages; this preserves locked versions while avoiding npm's cross-platform `npm ci` validation failure.
