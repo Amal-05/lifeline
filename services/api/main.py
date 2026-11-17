@@ -1,14 +1,20 @@
 import json
+import logging
+import os
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 from typing import Any
 
-from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi import FastAPI, File, HTTPException, Request, UploadFile
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from sqlalchemy import select
 
 from packages.protocol.python.lifeline_protocol import SyncBundle, verify_event
+from services.api.auth import router as auth_router
+from services.api.dashboard import router as dashboard_router
 from services.api.db import Base, SessionLocal, engine
 from services.api.models import EventRecord
 
@@ -20,8 +26,34 @@ async def lifespan(_: FastAPI):
 
 
 app = FastAPI(title="Lifeline API", version="1.0.0", lifespan=lifespan)
-app.add_middleware(CORSMiddleware, allow_origins=["http://localhost:4173", "http://127.0.0.1:4173"], allow_methods=["GET", "POST", "OPTIONS"], allow_headers=["content-type"])
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:4173", "http://127.0.0.1:4173"],
+    allow_methods=["GET", "POST", "PATCH", "OPTIONS"],
+    allow_headers=["authorization", "content-type"],
+)
+app.include_router(auth_router)
+app.include_router(dashboard_router)
 API_PREFIX = "/api/v1"
+logger = logging.getLogger("lifeline.api")
+
+
+@app.exception_handler(HTTPException)
+async def http_error_handler(_: Request, exc: HTTPException) -> JSONResponse:
+    code = {401: "unauthorized", 403: "forbidden", 404: "not_found", 409: "conflict", 413: "too_large", 429: "rate_limited"}.get(exc.status_code, "request_error")
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"error": {"code": code, "message": str(exc.detail), "details": {}}},
+        headers=exc.headers,
+    )
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_error_handler(_: Request, exc: RequestValidationError) -> JSONResponse:
+    return JSONResponse(
+        status_code=422,
+        content={"error": {"code": "validation_error", "message": "Request validation failed", "details": exc.errors()}},
+    )
 
 
 class MediaAck(BaseModel):
@@ -40,6 +72,19 @@ def media_id_from_bytes(content: bytes) -> str:
     return hashlib.sha256(content).hexdigest()[:26].upper()
 
 
+def enqueue_triage(event_ids: list[str]) -> None:
+    if not os.getenv("REDIS_URL"):
+        return
+    try:
+        from services.triage.tasks import process_event
+
+        for event_id in event_ids:
+            process_event.delay(event_id)
+    except Exception:
+        # Intake remains available; the immutable event log still holds the work for replay.
+        logger.exception("Triage queue unavailable; accepted events remain in the event log")
+
+
 @app.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
@@ -49,6 +94,7 @@ def health() -> dict[str, str]:
 def sync(bundle: SyncBundle) -> SyncResponse:
     accepted: list[str] = []
     rejected: list[dict[str, str]] = []
+    stored: list[str] = []
     with SessionLocal() as session:
         for event in bundle.events:
             try:
@@ -63,6 +109,7 @@ def sync(bundle: SyncBundle) -> SyncResponse:
                     payload=json.dumps(event.payload, sort_keys=True, separators=(",", ":")),
                     hops=event.hops, signature=event.signature,
                 ))
+                stored.append(event.event_id)
             accepted.append(event.event_id)
         session.commit()
         known = set(bundle.known_event_ids) | {event.event_id for event in bundle.events if event.event_id in accepted}
@@ -73,6 +120,7 @@ def sync(bundle: SyncBundle) -> SyncResponse:
              "payload": json.loads(row.payload), "hops": row.hops, "signature": row.signature}
             for row in missing
         ]
+    enqueue_triage(stored)
     return SyncResponse(accepted_ids=accepted, rejected=rejected, missing_events=missing_events)
 
 

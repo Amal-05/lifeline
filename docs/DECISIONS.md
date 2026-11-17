@@ -7,9 +7,15 @@
 - 2026-11-17: Keep a worker process in M0 so the service topology is present; asynchronous triage work begins in M2.
 - 2026-11-17: M1's local media route caps upload size and returns content-derived IDs. Durable object storage, resumable chunks, content scanning, auth ownership, and server-side media persistence are deferred to hardening.
 - 2026-11-17: M1 supports GPS, last-known coordinates, and manual coordinate entry. A cached offline basemap for selecting a visual pin is deferred because no offline tile source was supplied.
-- 2026-11-17: Docker is unavailable in this environment; Compose can be authored but its start-up acceptance cannot be demonstrated here.
+- 2026-11-17: Docker was unavailable in the initial restricted shell. Approved Docker daemon access was later enabled; Compose build, health, dashboard, and offline browser checks are now run directly.
 - 2026-11-17: The package registry was initially unreachable in the restricted shell. Package installation succeeded after using the approved package-manager path, and both npm and Python lockfiles are generated from exact pins.
 - 2026-11-17: A deterministic generated-set fallback keeps local protocol-law tests usable if Hypothesis cannot be installed; CI installs Hypothesis and runs its property-based cases.
 - 2026-11-17: Docker's npm 11 clean install rejected a lock generated on Windows because it omitted foreign-platform optional packages (Lightning CSS and Rolldown). Use lockfile-aware `npm install --include=optional` in Linux image builds and CI to materialize the platform packages; this preserves locked versions while avoiding npm's cross-platform `npm ci` validation failure.
 - 2026-11-17: TypeScript 7 needs its OS-specific native compiler package. Pin the Linux x64 package as an optional root dependency so it is represented in the cross-platform lockfile; use Debian slim for the build stage to provide a glibc Linux runtime.
 - 2026-11-17: Keep the Linux x64 GNU Rollup, Rolldown, and Lightning CSS bindings as explicit optional root dependencies too. npm on Windows omitted these entries from the lockfile even though Linux image builds need them.
+- 2026-11-17: M2 projects immutable events through a Celery worker and Redis stream. When Redis is absent in local tests, operator mutations replay synchronously to preserve deterministic coverage.
+- 2026-11-17: Duplicate text matching uses deterministic character n-gram cosine as the offline multilingual fallback until a licensed embedding model is configured; the scoring weight and hard distance/device rules remain explicit.
+- 2026-11-17: Translation remains pluggable and does not invent English text when an offline translation model is unavailable; original-language text and language tag are retained.
+- 2026-11-17: Routing uses a straight-line estimate with a visible warning until an offline road graph is supplied; road confidence is still time-decayed for operator context.
+- 2026-11-17: The coordinator dashboard is hosted at `/dashboard`; Nginx history fallback serves the SPA on direct navigation.
+- 2026-11-17: M2 migration uses SQLAlchemy metadata to create the initial schema, while Alembic provides the versioned deployment entry point. PostGIS geometry and production schema evolution remain M4 hardening.

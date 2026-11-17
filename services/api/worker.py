@@ -1,10 +1,10 @@
-"""M0 worker process placeholder; M2 adds asynchronous triage jobs."""
-import time
+"""Celery worker entry point for asynchronous triage and event fan-out."""
+
+from services.triage.celery_app import celery_app
 
 
 def main() -> None:
-    while True:
-        time.sleep(60)
+    celery_app.worker_main(["worker", "--loglevel=INFO"])
 
 
 if __name__ == "__main__":

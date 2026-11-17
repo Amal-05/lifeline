@@ -11,4 +11,5 @@ COPY packages/protocol/ts packages/protocol/ts
 RUN npm run build --workspace @lifeline/web
 FROM nginx:1.27.3-alpine
 COPY --from=build /app/apps/web/dist /usr/share/nginx/html
+COPY apps/web/nginx.conf /etc/nginx/conf.d/default.conf
 EXPOSE 80
