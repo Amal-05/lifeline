@@ -13,16 +13,23 @@ class MainActivity : Activity() {
     private val serviceId = "org.lifeline.field.mesh"
     private lateinit var status: TextView
     private val ledger = RelayLedger()
+    private val chunks = ChunkAssembler()
     private val connections = mutableSetOf<String>()
     private val strategy = Strategy.P2P_CLUSTER
     private val payloadCallback = object : PayloadCallback() {
         override fun onPayloadReceived(endpointId: String, payload: Payload) {
             if (payload.type != Payload.Type.BYTES) return
-            runCatching { MeshProtocol.decode(payload.asBytes()!!).let { frame ->
-                val id = org.json.JSONObject(frame.event).getString("event_id")
+            runCatching {
+                val received = payload.asBytes()!!
+                val complete = if (org.json.JSONObject(received.decodeToString()).optString("kind") == "chunk") chunks.offer(ChunkPart.decode(received)) else received
+                if (complete == null) return
+                MeshProtocol.decode(complete).let { frame ->
+                val envelope = org.json.JSONObject(frame.event)
+                if (!EventSignatureVerifier.verify(envelope)) return
+                val id = envelope.getString("event_id")
                 if (ledger.accept(id, frame.event.toByteArray().size)) frame.relay()?.let { relay ->
                     connections.filter { it != endpointId }.forEach { peer ->
-                        Nearby.getConnectionsClient(this@MainActivity).sendPayload(peer, Payload.fromBytes(relay.encode()))
+                        sendEvent(peer, relay.encode())
                     }
                 }
             } }
@@ -57,6 +64,13 @@ class MainActivity : Activity() {
             override fun onEndpointLost(endpointId: String) = Unit
         }, DiscoveryOptions.Builder().setStrategy(strategy).build())
         status.text = "Discovering nearby peers…"
+    }
+    private fun sendEvent(endpointId: String, bytes: ByteArray) {
+        val client = Nearby.getConnectionsClient(this)
+        if (bytes.size <= 32768) client.sendPayload(endpointId, Payload.fromBytes(bytes))
+        else EventChunker.split(java.util.UUID.randomUUID().toString(), bytes).forEach { part ->
+            client.sendPayload(endpointId, Payload.fromBytes(part.encode()))
+        }
     }
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grants: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grants)
