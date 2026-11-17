@@ -25,6 +25,15 @@ jobs:
       - run: git diff --exit-code -- docs/openapi.json
       - run: npm exec playwright install --with-deps chromium
       - run: npm run test:e2e --workspace @lifeline/web
+  android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: {distribution: 'temurin', java-version: '17'}
+      - uses: android-actions/setup-android@v3
+      - uses: gradle/actions/setup-gradle@v4
+      - run: gradle -p apps/android testDebugUnitTest assembleDebug
 # Decisions
 
 - 2026-11-17: Use a new monorepo scaffold because the repository was empty; use SQLite only for direct local API development while Compose uses PostGIS-backed PostgreSQL.

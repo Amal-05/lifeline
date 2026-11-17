@@ -2,7 +2,7 @@
 
 Lifeline is an offline-first disaster-response coordination platform. It stores an SOS on the device before attempting sync, then helps coordinators receive and route requests when connectivity returns. It coordinates rescue and flags risk; it does not predict disasters or replace official emergency numbers and warnings.
 
-This repository implements the M0 foundation and the M1 offline SOS and sync flow. All included data is synthetic.
+This repository implements M0 through M3: an offline signed SOS outbox, server sync, coordinator triage and dispatch, plus an Android nearby mesh relay scaffold. All included data is synthetic.
 
 ## Requirements
 
@@ -17,7 +17,7 @@ Copy-Item .env.example .env
 docker compose -f infra/docker-compose.yml up --build
 ```
 
-Open the field client at http://localhost:4173 and the API schema at http://localhost:8000/docs. For local development without Docker, install Python dependencies with `python -m pip install -r requirements.lock` followed by `python -m pip install --no-deps -e .`, install JavaScript dependencies with `npm install --include=optional`, start the API with `uvicorn services.api.main:app --reload`, and start Vite with `npm run dev --workspace @lifeline/web`.
+Open the field client at http://localhost:4173, operations dashboard at http://localhost:4173/dashboard, and API schema at http://localhost:8000/docs. The synthetic coordinator login is `coordinator@example.com` / `demo-only-change-me` (override with `.env`). For local development without Docker, install Python dependencies with `python -m pip install -r requirements.lock` followed by `python -m pip install --no-deps -e .`, install JavaScript dependencies with `npm install --include=optional`, start the API with `uvicorn services.api.main:app --reload`, and start Vite with `npm run dev --workspace @lifeline/web`.
 
 ## Checks
 
@@ -29,6 +29,6 @@ npm run build
 npm run test:e2e --workspace @lifeline/web
 ```
 
-## Scope and limitations
+## Milestones and limitations
 
-The first milestone provides a versioned protocol contract, Ed25519 signing and verification, event-set merge, HLC, Compose services, and CI. The second adds a four-language SOS form, IndexedDB outbox, offline persistence, and sync acknowledgment. Android mesh, triage, coordinator dashboard, authentication, and simulator are later milestones. The M1 API currently holds media only long enough to compute its content-derived ID; persistent media storage and secure key protection require deployment hardening. Do not submit real rescue requests to this demo.
+M2 adds authenticated incident filters and details, urgency explanations, merge review, audit history, team matching, assignment status, road reports, CSV/GeoJSON export, and a dashboard event WebSocket. M3 adds an Android Nearby Connections peer scaffold and synthetic mesh harness. M2/M3 demo details are in `docs/demo` and `docs/mesh-protocol.md`. Local demo media is held only long enough to compute a content-derived ID; durable storage, device-lab Android verification, licensed translation/embedding models, offline map tiles, and production routing remain deployment tasks. Do not submit real rescue requests to this demo.

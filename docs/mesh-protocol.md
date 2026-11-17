@@ -1,0 +1,7 @@
+# Lifeline mesh protocol (M3)
+
+The transport uses Google Nearby Connections `P2P_CLUSTER`. A peer advertises and discovers service `org.lifeline.field.mesh`; peers accept connections and relay signed event envelopes as opaque JSON. Relays must preserve the signed event bytes. Mutable relay metadata is outside the signed event: `hops` starts at 0 and increments per forward, `ttl` starts at 12 and decrements. Drop at `ttl <= 0`, `hops >= 12`, duplicate event ID, or invalid event signature. Gateways submit the original event to `/api/v1/sync`, where Ed25519 verification is authoritative.
+
+Each transfer frame is at most 32 KiB. Larger event/media payloads use numbered chunks with a content hash and are reassembled before event validation. A node keeps at most 5,000 events or 20 MiB, whichever limit is reached first, evicting oldest acknowledged/expired relay entries first. A node maintains at most four connected peers; use the platform cluster strategy and prefer peers with a gateway route. Relay only unseen events and exclude the sender from fan-out.
+
+The Android client uses Nearby Connections `P2P_CLUSTER` discovery/advertising, requests runtime nearby permissions, caps active peers at four, and maintains an in-memory duplicate ledger in this first implementation. The Python harness models a degree-four 100-node network, a three-hop gateway path, TTL, and deterministic event propagation. Physical two-phone validation remains a device-lab task; this repository uses the spec-authorized simulator substitute.
