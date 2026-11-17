@@ -14,7 +14,7 @@ export default defineConfig({
       cwd: repoRoot,
       port: 8000,
       reuseExistingServer: !process.env.CI,
-      env: { DATABASE_URL: "sqlite:///./lifeline-e2e.sqlite3" },
+      env: { DATABASE_URL: "sqlite:///./lifeline-e2e.sqlite3", DEMO_MODE: "true" },
     },
     {
       command: "npm run build && npm run preview -- --host 127.0.0.1 --port 4173",

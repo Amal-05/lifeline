@@ -191,3 +191,22 @@ class AuditLog(Base):
     after_data: Mapped[dict | None] = mapped_column("after", JSON, nullable=True)
     reason: Mapped[str | None] = mapped_column(Text, nullable=True)
     at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, index=True)
+
+
+class RiskCell(Base):
+    __tablename__ = "risk_cells"
+    cell_id: Mapped[str] = mapped_column(String(20), primary_key=True)
+    risk_index: Mapped[int] = mapped_column(Integer, index=True)
+    factors: Mapped[dict] = mapped_column(JSON, default=dict)
+    geometry_geojson: Mapped[dict] = mapped_column(JSON)
+    source: Mapped[str] = mapped_column(String(120), default="synthetic")
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, onupdate=utc_now)
+
+
+class HouseholdRegistration(Base):
+    __tablename__ = "household_registrations"
+    registration_id: Mapped[str] = mapped_column(String(26), primary_key=True)
+    h3_cell: Mapped[str] = mapped_column(String(20), index=True)
+    encrypted_payload: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)

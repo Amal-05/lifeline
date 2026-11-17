@@ -18,6 +18,8 @@ jobs:
       - run: python -m ruff check .
       - run: python -m compileall -q services packages
       - run: python -m pytest
+      - run: python -m services.simulator.m4 --seeds 10 --output docs/results/m4-simulation.json
+      - run: git diff --exit-code -- docs/results/m4-simulation.json
       - run: npm run lint
       - run: npm run build
       - run: npm test
@@ -33,6 +35,8 @@ jobs:
         with: {distribution: 'temurin', java-version: '17'}
       - uses: android-actions/setup-android@v3
       - uses: gradle/actions/setup-gradle@v4
+        with: {gradle-version: '8.14.3'}
+      - run: sdkmanager "platforms;android-36" "build-tools;36.0.0"
       - run: gradle -p apps/android testDebugUnitTest assembleDebug
 # Decisions
 

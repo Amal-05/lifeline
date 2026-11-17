@@ -19,3 +19,8 @@
 - 2026-11-17: Routing uses a straight-line estimate with a visible warning until an offline road graph is supplied; road confidence is still time-decayed for operator context.
 - 2026-11-17: The coordinator dashboard is hosted at `/dashboard`; Nginx history fallback serves the SPA on direct navigation.
 - 2026-11-17: M2 migration uses SQLAlchemy metadata to create the initial schema, while Alembic provides the versioned deployment entry point. PostGIS geometry and production schema evolution remain M4 hardening.
+- 2026-11-17: M3 relays preserve original signed event bytes and keep hop/TTL counters in an outer transport frame because mutating signed hops would invalidate Ed25519 signatures. Android physical-device acceptance is represented by the spec-approved 100-node simulator in this environment.
+- 2026-11-17: M4 uses synthetic H3 risk cells because no licensed public hazard or basemap dataset was supplied. Household PII is encrypted before persistence; production must configure and securely back up a registry key.
+- 2026-11-17: The risk score weights hazard exposure 40%, population density 20%, vulnerable-household density 25%, and access difficulty 15%; this is a transparent demo index, not an official forecast.
+- 2026-11-17: M4 simulation reports use three named synthetic scenarios with ten independent seeds each. k6 measures authenticated incident reads; its output is a local deployment measurement, not a service-level guarantee.
+- 2026-11-18: Local k6 read load passes at 25 VUs (8,204 requests, 102.4 req/s, p95 274 ms, 0% failures); 100 VUs exceeds the local container capacity (about 31 req/s, p95 695 ms, 2.34% failures). Preserve both measurements as capacity evidence rather than weakening thresholds.

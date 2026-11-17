@@ -1,0 +1,306 @@
+{
+  "data_classification": "synthetic",
+  "runs_total": 30,
+  "scenarios": [
+    {
+      "scenario": "urban_flood",
+      "requests_per_seed": 500,
+      "seed_count": 10,
+      "runs": [
+        {
+          "seed": 1,
+          "requests": 500,
+          "baseline_incidents": 500,
+          "triaged_incidents": 101,
+          "duplicates_reduced": 399,
+          "precision": 1.0,
+          "recall": 0.805
+        },
+        {
+          "seed": 2,
+          "requests": 500,
+          "baseline_incidents": 500,
+          "triaged_incidents": 105,
+          "duplicates_reduced": 395,
+          "precision": 1.0,
+          "recall": 0.825
+        },
+        {
+          "seed": 3,
+          "requests": 500,
+          "baseline_incidents": 500,
+          "triaged_incidents": 107,
+          "duplicates_reduced": 393,
+          "precision": 1.0,
+          "recall": 0.824
+        },
+        {
+          "seed": 4,
+          "requests": 500,
+          "baseline_incidents": 500,
+          "triaged_incidents": 105,
+          "duplicates_reduced": 395,
+          "precision": 1.0,
+          "recall": 0.791
+        },
+        {
+          "seed": 5,
+          "requests": 500,
+          "baseline_incidents": 500,
+          "triaged_incidents": 102,
+          "duplicates_reduced": 398,
+          "precision": 1.0,
+          "recall": 0.809
+        },
+        {
+          "seed": 6,
+          "requests": 500,
+          "baseline_incidents": 500,
+          "triaged_incidents": 107,
+          "duplicates_reduced": 393,
+          "precision": 1.0,
+          "recall": 0.785
+        },
+        {
+          "seed": 7,
+          "requests": 500,
+          "baseline_incidents": 500,
+          "triaged_incidents": 105,
+          "duplicates_reduced": 395,
+          "precision": 1.0,
+          "recall": 0.832
+        },
+        {
+          "seed": 8,
+          "requests": 500,
+          "baseline_incidents": 500,
+          "triaged_incidents": 104,
+          "duplicates_reduced": 396,
+          "precision": 1.0,
+          "recall": 0.824
+        },
+        {
+          "seed": 9,
+          "requests": 500,
+          "baseline_incidents": 500,
+          "triaged_incidents": 104,
+          "duplicates_reduced": 396,
+          "precision": 1.0,
+          "recall": 0.796
+        },
+        {
+          "seed": 10,
+          "requests": 500,
+          "baseline_incidents": 500,
+          "triaged_incidents": 104,
+          "duplicates_reduced": 396,
+          "precision": 1.0,
+          "recall": 0.821
+        }
+      ],
+      "mean_precision": 1.0,
+      "mean_recall": 0.8112,
+      "mean_duplicate_reduction": 395.6
+    },
+    {
+      "scenario": "rural_isolation",
+      "requests_per_seed": 200,
+      "seed_count": 10,
+      "runs": [
+        {
+          "seed": 1,
+          "requests": 200,
+          "baseline_incidents": 200,
+          "triaged_incidents": 41,
+          "duplicates_reduced": 159,
+          "precision": 1.0,
+          "recall": 0.79
+        },
+        {
+          "seed": 2,
+          "requests": 200,
+          "baseline_incidents": 200,
+          "triaged_incidents": 40,
+          "duplicates_reduced": 160,
+          "precision": 1.0,
+          "recall": 0.87
+        },
+        {
+          "seed": 3,
+          "requests": 200,
+          "baseline_incidents": 200,
+          "triaged_incidents": 43,
+          "duplicates_reduced": 157,
+          "precision": 1.0,
+          "recall": 0.845
+        },
+        {
+          "seed": 4,
+          "requests": 200,
+          "baseline_incidents": 200,
+          "triaged_incidents": 42,
+          "duplicates_reduced": 158,
+          "precision": 1.0,
+          "recall": 0.795
+        },
+        {
+          "seed": 5,
+          "requests": 200,
+          "baseline_incidents": 200,
+          "triaged_incidents": 41,
+          "duplicates_reduced": 159,
+          "precision": 1.0,
+          "recall": 0.795
+        },
+        {
+          "seed": 6,
+          "requests": 200,
+          "baseline_incidents": 200,
+          "triaged_incidents": 40,
+          "duplicates_reduced": 160,
+          "precision": 1.0,
+          "recall": 0.7825
+        },
+        {
+          "seed": 7,
+          "requests": 200,
+          "baseline_incidents": 200,
+          "triaged_incidents": 41,
+          "duplicates_reduced": 159,
+          "precision": 1.0,
+          "recall": 0.845
+        },
+        {
+          "seed": 8,
+          "requests": 200,
+          "baseline_incidents": 200,
+          "triaged_incidents": 42,
+          "duplicates_reduced": 158,
+          "precision": 1.0,
+          "recall": 0.8525
+        },
+        {
+          "seed": 9,
+          "requests": 200,
+          "baseline_incidents": 200,
+          "triaged_incidents": 41,
+          "duplicates_reduced": 159,
+          "precision": 1.0,
+          "recall": 0.7825
+        },
+        {
+          "seed": 10,
+          "requests": 200,
+          "baseline_incidents": 200,
+          "triaged_incidents": 41,
+          "duplicates_reduced": 159,
+          "precision": 1.0,
+          "recall": 0.82
+        }
+      ],
+      "mean_precision": 1.0,
+      "mean_recall": 0.81775,
+      "mean_duplicate_reduction": 158.8
+    },
+    {
+      "scenario": "medical_surge",
+      "requests_per_seed": 350,
+      "seed_count": 10,
+      "runs": [
+        {
+          "seed": 1,
+          "requests": 350,
+          "baseline_incidents": 350,
+          "triaged_incidents": 71,
+          "duplicates_reduced": 279,
+          "precision": 1.0,
+          "recall": 0.8014285714285714
+        },
+        {
+          "seed": 2,
+          "requests": 350,
+          "baseline_incidents": 350,
+          "triaged_incidents": 73,
+          "duplicates_reduced": 277,
+          "precision": 1.0,
+          "recall": 0.83
+        },
+        {
+          "seed": 3,
+          "requests": 350,
+          "baseline_incidents": 350,
+          "triaged_incidents": 75,
+          "duplicates_reduced": 275,
+          "precision": 1.0,
+          "recall": 0.8271428571428572
+        },
+        {
+          "seed": 4,
+          "requests": 350,
+          "baseline_incidents": 350,
+          "triaged_incidents": 74,
+          "duplicates_reduced": 276,
+          "precision": 1.0,
+          "recall": 0.7742857142857142
+        },
+        {
+          "seed": 5,
+          "requests": 350,
+          "baseline_incidents": 350,
+          "triaged_incidents": 72,
+          "duplicates_reduced": 278,
+          "precision": 1.0,
+          "recall": 0.7942857142857143
+        },
+        {
+          "seed": 6,
+          "requests": 350,
+          "baseline_incidents": 350,
+          "triaged_incidents": 76,
+          "duplicates_reduced": 274,
+          "precision": 1.0,
+          "recall": 0.7757142857142857
+        },
+        {
+          "seed": 7,
+          "requests": 350,
+          "baseline_incidents": 350,
+          "triaged_incidents": 74,
+          "duplicates_reduced": 276,
+          "precision": 1.0,
+          "recall": 0.8328571428571429
+        },
+        {
+          "seed": 8,
+          "requests": 350,
+          "baseline_incidents": 350,
+          "triaged_incidents": 72,
+          "duplicates_reduced": 278,
+          "precision": 1.0,
+          "recall": 0.8457142857142858
+        },
+        {
+          "seed": 9,
+          "requests": 350,
+          "baseline_incidents": 350,
+          "triaged_incidents": 73,
+          "duplicates_reduced": 277,
+          "precision": 1.0,
+          "recall": 0.7942857142857143
+        },
+        {
+          "seed": 10,
+          "requests": 350,
+          "baseline_incidents": 350,
+          "triaged_incidents": 73,
+          "duplicates_reduced": 277,
+          "precision": 1.0,
+          "recall": 0.8185714285714286
+        }
+      ],
+      "mean_precision": 1.0,
+      "mean_recall": 0.8094285714285714,
+      "mean_duplicate_reduction": 276.7
+    }
+  ]
+}
