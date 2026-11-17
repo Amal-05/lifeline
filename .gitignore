@@ -11,3 +11,6 @@ test-results/
 coverage/
 *.sqlite3
 *.egg-info/
+
+*.tsbuildinfo
+apps/web/dev-dist/
