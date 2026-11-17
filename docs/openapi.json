@@ -1207,6 +1207,174 @@
         }
       }
     },
+    "/api/v1/risk/cells": {
+      "get": {
+        "tags": [
+          "risk and preparedness"
+        ],
+        "summary": "Get Risk Cells",
+        "operationId": "get_risk_cells_api_v1_risk_cells_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Get Risk Cells Api V1 Risk Cells Get"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/risk/cells/import": {
+      "put": {
+        "tags": [
+          "risk and preparedness"
+        ],
+        "summary": "Import Risk Layer",
+        "operationId": "import_risk_layer_api_v1_risk_cells_import_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RiskLayerImport"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "integer"
+                  },
+                  "type": "object",
+                  "title": "Response Import Risk Layer Api V1 Risk Cells Import Put"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/households/register": {
+      "post": {
+        "tags": [
+          "risk and preparedness"
+        ],
+        "summary": "Register Household",
+        "operationId": "register_household_api_v1_households_register_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HouseholdRegistrationBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object",
+                  "title": "Response Register Household Api V1 Households Register Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/households/summary": {
+      "get": {
+        "tags": [
+          "risk and preparedness"
+        ],
+        "summary": "Household Summary",
+        "operationId": "household_summary_api_v1_households_summary_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": {
+                      "anyOf": [
+                        {
+                          "type": "integer"
+                        },
+                        {
+                          "type": "string"
+                        }
+                      ]
+                    },
+                    "type": "object"
+                  },
+                  "type": "array",
+                  "title": "Response Household Summary Api V1 Households Summary Get"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/health": {
       "get": {
         "summary": "Health",
@@ -1537,6 +1705,62 @@
         "type": "object",
         "title": "HTTPValidationError"
       },
+      "HouseholdRegistrationBody": {
+        "properties": {
+          "latitude": {
+            "type": "number",
+            "maximum": 90.0,
+            "minimum": -90.0,
+            "title": "Latitude"
+          },
+          "longitude": {
+            "type": "number",
+            "maximum": 180.0,
+            "minimum": -180.0,
+            "title": "Longitude"
+          },
+          "household_size": {
+            "type": "integer",
+            "maximum": 30.0,
+            "minimum": 1.0,
+            "title": "Household Size"
+          },
+          "vulnerability_tags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 12,
+            "title": "Vulnerability Tags"
+          },
+          "contact_name": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Contact Name"
+          },
+          "contact_phone": {
+            "type": "string",
+            "maxLength": 32,
+            "minLength": 5,
+            "title": "Contact Phone"
+          },
+          "consent": {
+            "type": "boolean",
+            "title": "Consent"
+          }
+        },
+        "type": "object",
+        "required": [
+          "latitude",
+          "longitude",
+          "household_size",
+          "contact_name",
+          "contact_phone",
+          "consent"
+        ],
+        "title": "HouseholdRegistrationBody"
+      },
       "IncidentPatch": {
         "properties": {
           "status": {
@@ -1674,6 +1898,32 @@
           "refresh_token"
         ],
         "title": "RefreshBody"
+      },
+      "RiskLayerImport": {
+        "properties": {
+          "source": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 3,
+            "title": "Source"
+          },
+          "features": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "maxItems": 10000,
+            "minItems": 1,
+            "title": "Features"
+          }
+        },
+        "type": "object",
+        "required": [
+          "source",
+          "features"
+        ],
+        "title": "RiskLayerImport"
       },
       "RoadReportBody": {
         "properties": {

@@ -31,6 +31,7 @@ services:
       DEMO_MODE: ${DEMO_MODE:-true}
       DEMO_ADMIN_EMAIL: ${DEMO_ADMIN_EMAIL:-coordinator@example.com}
       DEMO_ADMIN_PASSWORD: ${DEMO_ADMIN_PASSWORD:-demo-only-change-me}
+      REGISTRY_ENCRYPTION_KEY: ${REGISTRY_ENCRYPTION_KEY:-lifeline-synthetic-demo-key-replace-before-deploy}
     ports: ["8000:8000"]
     depends_on:
       db: {condition: service_healthy}
