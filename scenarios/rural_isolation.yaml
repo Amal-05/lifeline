@@ -1,0 +1,13 @@
+name: rural_isolation
+area_km2: 2400
+population: 180000
+phones: [500, 5000, 20000]
+app_share: 0.3
+mesh_range_km: 0.65
+flood_intensity: 0.55
+outage_area_share: 0.78
+tower_recovery_min_hours: 5
+duration_hours: 12
+sos_per_1000_phones_hour: 3.5
+duplicate_report_share: 0.22
+vulnerable_share: 0.24
