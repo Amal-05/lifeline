@@ -4,17 +4,18 @@ from fastapi import HTTPException
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session
 
-from services.api.models import Base, HouseholdRegistration, User
-from services.api.models import AuditLog
+from services.api.models import AuditLog, Base, HouseholdRegistration, User
 from services.api.risk import (
     HouseholdRegistrationBody,
+    RiskCsvImport,
     RiskLayerImport,
+    delete_household,
+    export_household,
     get_risk_cells,
+    household_map,
+    import_risk_csv,
     import_risk_layer,
     register_household,
-    export_household,
-    delete_household,
-    household_map,
 )
 
 
@@ -86,3 +87,43 @@ def test_admin_risk_import_recomputes_weighted_index(risk_session):
     }])
     result = import_risk_layer(body, risk_session, User(user_id="A" * 26, role="admin"))
     assert result == {"imported": 1}
+
+
+def test_csv_risk_fallback_derives_transparent_hazard_and_context_factors(risk_session):
+    cell = h3.latlng_to_cell(10, 76, 8)
+    body = RiskCsvImport(source="DEM/rainfall/river fallback", license="synthetic", csv_text=(
+        "cell_id,elevation_m,slope_deg,distance_to_water_m,rainfall_mm_24h,flood_history_count,"
+        "population_density_per_km2,vulnerable_households_per_1000,road_access_score\n"
+        f"{cell},10,20,100,120,5,1500,25,30\n"
+    ))
+    result = import_risk_csv(body, risk_session, User(user_id="A" * 26, role="admin"))
+    from services.api.models import RiskCell
+
+    stored = risk_session.get(RiskCell, cell)
+    assert result == {"imported": 1}
+    assert stored.source == "DEM/rainfall/river fallback (synthetic)"
+    assert stored.factors["rainfall_mm_24h"] == 120
+    assert stored.factors["hazard_exposure"] > 70
+    assert stored.factors["access_difficulty"] == 70
+
+
+def test_csv_risk_fallback_rejects_bad_cell_and_negative_measurements(risk_session):
+    from services.api.risk import HTTPException
+
+    header = "cell_id,elevation_m,slope_deg,distance_to_water_m,rainfall_mm_24h,flood_history_count,population_density_per_km2,vulnerable_households_per_1000,road_access_score\n"
+    bad_cell = RiskCsvImport(source="synthetic test", csv_text=header + "not-h3,1,1,1,1,1,1,1,1\n")
+    with pytest.raises(HTTPException) as invalid_cell:
+        import_risk_csv(bad_cell, risk_session, User(user_id="A" * 26, role="admin"))
+    assert invalid_cell.value.status_code == 422
+    cell = h3.latlng_to_cell(10, 76, 8)
+    negative = RiskCsvImport(source="synthetic test", csv_text=header + f"{cell},-1,1,1,1,1,1,1,1\n")
+    with pytest.raises(HTTPException) as invalid_value:
+        import_risk_csv(negative, risk_session, User(user_id="A" * 26, role="admin"))
+    assert invalid_value.value.status_code == 422
+
+
+def test_csv_risk_import_requires_synthetic_or_open_license():
+    from pydantic import ValidationError
+
+    with pytest.raises(ValidationError):
+        RiskCsvImport(source="unlicensed dataset", license="proprietary", csv_text="x")

@@ -15,6 +15,11 @@ PHONE_COUNTS = (500, 5000, 20000)
 METHODS = ("Baseline A: group chat", "Baseline B: server triage", "Lifeline: mesh + triage")
 
 
+def _mean(rows: list[dict[str, Any]], key: str) -> float | None:
+    values = [row[key] for row in rows if row[key] is not None]
+    return mean(values) if values else None
+
+
 def _load_scenarios(directory: Path = SCENARIO_DIR) -> dict[str, dict[str, Any]]:
     scenarios = {}
     for path in sorted(directory.glob("*.yaml")):
@@ -128,10 +133,9 @@ def write_reports(result: dict[str, Any], output: Path) -> None:
     for case in result["cases"]:
         for method in METHODS:
             selected = [row for row in case["runs"] if row["method"] == method]
-            avg = lambda key: mean(values) if (values := [row[key] for row in selected if row[key] is not None]) else None
-            assignment = avg("mean_assignment_minutes")
+            assignment = _mean(selected, "mean_assignment_minutes")
             assignment_text = f"{assignment:.1f}" if assignment is not None else "n/a"
-            lines.append(f"| {case['scenario']} | {case['phones']:,} | {method} | {avg('delivered_1h_pct'):.1f}% | {avg('delivered_3h_pct'):.1f}% | {avg('delivered_6h_pct'):.1f}% | {avg('delivered_12h_pct'):.1f}% | {avg('mean_latency_minutes'):.1f} | {avg('duplicate_precision'):.2f}/{avg('duplicate_recall'):.2f} | {avg('manual_review_reduction_pct'):.1f}% | {avg('ndcg_at_20'):.2f} | {assignment_text} | {avg('vulnerable_coverage_pct'):.1f}% | {avg('mesh_bytes_per_phone'):.2f} |")
+            lines.append(f"| {case['scenario']} | {case['phones']:,} | {method} | {_mean(selected, 'delivered_1h_pct'):.1f}% | {_mean(selected, 'delivered_3h_pct'):.1f}% | {_mean(selected, 'delivered_6h_pct'):.1f}% | {_mean(selected, 'delivered_12h_pct'):.1f}% | {_mean(selected, 'mean_latency_minutes'):.1f} | {_mean(selected, 'duplicate_precision'):.2f}/{_mean(selected, 'duplicate_recall'):.2f} | {_mean(selected, 'manual_review_reduction_pct'):.1f}% | {_mean(selected, 'ndcg_at_20'):.2f} | {assignment_text} | {_mean(selected, 'vulnerable_coverage_pct'):.1f}% | {_mean(selected, 'mesh_bytes_per_phone'):.2f} |")
     (output / "README.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
     bars = []
     for index, row in enumerate(rows[:30]):
@@ -156,9 +160,13 @@ def main() -> None:
     parser.add_argument("--scenario", choices=["all", *scenarios], default="all")
     parser.add_argument("--phones", type=int, choices=PHONE_COUNTS, action="append")
     parser.add_argument("--output-dir", default="reports")
+    parser.add_argument("--output", default="docs/results/m4-simulation.json")
     args = parser.parse_args()
     selected = scenarios if args.scenario == "all" else {args.scenario: scenarios[args.scenario]}
     result = run_suite(args.seeds, tuple(args.phones or PHONE_COUNTS), selected)
+    output_path = Path(args.output)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
     for case in result["cases"]:
         write_reports({**result, "cases": [case], "runs_total": len(case["runs"])}, Path(args.output_dir) / case["scenario"] / str(case["phones"]))
     print(json.dumps({"runs_total": result["runs_total"], "cases": len(result["cases"]), "output_dir": args.output_dir}))

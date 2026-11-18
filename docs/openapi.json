@@ -951,6 +951,37 @@
         }
       }
     },
+    "/api/v1/assignments/mine": {
+      "get": {
+        "tags": [
+          "dashboard"
+        ],
+        "summary": "My Assignments",
+        "operationId": "my_assignments_api_v1_assignments_mine_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "type": "array",
+                  "title": "Response My Assignments Api V1 Assignments Mine Get"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/routes": {
       "get": {
         "tags": [
@@ -1285,6 +1316,56 @@
         ]
       }
     },
+    "/api/v1/risk/cells/import-csv": {
+      "post": {
+        "tags": [
+          "risk and preparedness"
+        ],
+        "summary": "Import Risk Csv",
+        "operationId": "import_risk_csv_api_v1_risk_cells_import_csv_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RiskCsvImport"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "integer"
+                  },
+                  "type": "object",
+                  "title": "Response Import Risk Csv Api V1 Risk Cells Import Csv Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/households/register": {
       "post": {
         "tags": [
@@ -1335,6 +1416,95 @@
         ]
       }
     },
+    "/api/v1/households/{registration_id}/export": {
+      "get": {
+        "tags": [
+          "risk and preparedness"
+        ],
+        "summary": "Export Household",
+        "operationId": "export_household_api_v1_households__registration_id__export_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "registration_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Registration Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Export Household Api V1 Households  Registration Id  Export Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/households/{registration_id}": {
+      "delete": {
+        "tags": [
+          "risk and preparedness"
+        ],
+        "summary": "Delete Household",
+        "operationId": "delete_household_api_v1_households__registration_id__delete",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "registration_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Registration Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/households/summary": {
       "get": {
         "tags": [
@@ -1363,6 +1533,35 @@
                   },
                   "type": "array",
                   "title": "Response Household Summary Api V1 Households Summary Get"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/households/map": {
+      "get": {
+        "tags": [
+          "risk and preparedness"
+        ],
+        "summary": "Household Map",
+        "description": "Return coarse cell centroids and counts; never expose registry coordinates or PII.",
+        "operationId": "household_map_api_v1_households_map_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Household Map Api V1 Households Map Get"
                 }
               }
             }
@@ -1899,6 +2098,39 @@
         ],
         "title": "RefreshBody"
       },
+      "RiskCsvImport": {
+        "properties": {
+          "source": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 3,
+            "title": "Source"
+          },
+          "license": {
+            "type": "string",
+            "enum": [
+              "synthetic",
+              "CC-BY-4.0",
+              "ODbL-1.0",
+              "public-domain"
+            ],
+            "title": "License",
+            "default": "synthetic"
+          },
+          "csv_text": {
+            "type": "string",
+            "maxLength": 2000000,
+            "minLength": 1,
+            "title": "Csv Text"
+          }
+        },
+        "type": "object",
+        "required": [
+          "source",
+          "csv_text"
+        ],
+        "title": "RiskCsvImport"
+      },
       "RiskLayerImport": {
         "properties": {
           "source": {
@@ -1906,6 +2138,17 @@
             "maxLength": 120,
             "minLength": 3,
             "title": "Source"
+          },
+          "license": {
+            "type": "string",
+            "enum": [
+              "synthetic",
+              "CC-BY-4.0",
+              "ODbL-1.0",
+              "public-domain"
+            ],
+            "title": "License",
+            "default": "synthetic"
           },
           "features": {
             "items": {
