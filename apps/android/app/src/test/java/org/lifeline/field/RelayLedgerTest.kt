@@ -53,6 +53,43 @@ class RelayLedgerTest {
         assertEquals(4, restored.stored().single().priority)
     }
 
+    @Test fun gatewayDeliveryReceiptsArePortableAndMarkEventsDelivered() {
+        val ledger = RelayLedger()
+        assertTrue(ledger.accept("event-1", 12, ownUndeliveredSos = true, signedEvent = "{signed}"))
+        val receipt = DeliveredReceipt.decode(DeliveredReceipt(setOf("event-1")).encode())
+        receipt.eventIds.forEach(ledger::markDelivered)
+        assertTrue(ledger.stored().single().delivered)
+    }
+
+    @Test fun oneHundredNodeKotlinMeshHarnessConvergesWithinHopLimit() {
+        val nodes = List(100) { RelayLedger() }
+        val neighbors = List(100) { index ->
+            setOf((index + 1) % 100, (index + 99) % 100, (index + 10) % 100, (index + 90) % 100)
+        }
+        val eventId = "synthetic-sos"
+        val signedEvent = "{synthetic-signed-event}"
+        assertTrue(nodes[50].accept(eventId, signedEvent.length, priority = 4,
+            ownUndeliveredSos = true, signedEvent = signedEvent))
+        var frontier = mapOf(50 to RelayFrame(signedEvent, hops = 0))
+        repeat(12) {
+            val next = linkedMapOf<Int, RelayFrame>()
+            frontier.forEach { (sender, frame) ->
+                val relayed = frame.relay() ?: return@forEach
+                neighbors[sender].forEach { receiver ->
+                    if (eventId !in nodes[receiver].ids()) {
+                        val accepted = nodes[receiver].accept(eventId, signedEvent.length, priority = 4,
+                            signedEvent = signedEvent, hops = relayed.hops, ttl = relayed.ttl)
+                        if (accepted) next[receiver] = relayed
+                    }
+                }
+            }
+            frontier = next
+        }
+        assertTrue("event must reach the gateway at node 0", eventId in nodes[0].ids())
+        assertTrue("event must converge to all simulated devices", nodes.all { eventId in it.ids() })
+        assertTrue(nodes[0].stored().single().hops in 3..12)
+    }
+
     @Test fun chunksReassembleOutOfOrderAndCheckHash() {
         val original = ByteArray(EventChunker.CHUNK_SIZE * 2 + 10) { (it % 251).toByte() }
         val pieces = EventChunker.split("transfer", original)

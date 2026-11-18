@@ -14,6 +14,20 @@ data class RelayFrame(val event: String, val hops: Int, val ttl: Int = 12) {
     companion object { fun decode(bytes: ByteArray) = JSONObject(bytes.decodeToString()).let { RelayFrame(it.getString("event"), it.getInt("hops"), it.optInt("ttl", 12)) } }
 }
 
+data class DeliveredReceipt(val eventIds: Set<String>) {
+    fun encode(): ByteArray = JSONObject().put("kind", "delivered")
+        .put("event_ids", org.json.JSONArray(eventIds.sorted())).toString().toByteArray()
+
+    companion object {
+        fun decode(bytes: ByteArray): DeliveredReceipt = JSONObject(bytes.decodeToString()).let { json ->
+            require(json.getString("kind") == "delivered")
+            val ids = json.getJSONArray("event_ids")
+            require(ids.length() <= 5000)
+            DeliveredReceipt((0 until ids.length()).map { ids.getString(it) }.toSet())
+        }
+    }
+}
+
 data class ChunkPart(val transferId: String, val index: Int, val total: Int, val sha256: String, val bytes: ByteArray) {
     fun encode(): ByteArray = JSONObject().put("kind", "chunk").put("transfer_id", transferId)
         .put("index", index).put("total", total).put("sha256", sha256)
@@ -129,7 +143,7 @@ data class PeerHello(
     }
 }
 
-class InventoryBloomFilter(private val bitCount: Int = 2048, private val hashCount: Int = 4, encoded: String? = null) {
+class InventoryBloomFilter(private val bitCount: Int = 49_000, private val hashCount: Int = 7, encoded: String? = null) {
     private val bits = if (encoded == null) ByteArray((bitCount + 7) / 8) else Base64.getUrlDecoder().decode(encoded)
     init { require(bitCount >= 64 && hashCount in 1..8 && bits.size == (bitCount + 7) / 8) }
     private fun indexes(value: String): List<Int> {
