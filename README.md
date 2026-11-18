@@ -21,6 +21,8 @@ Open the field client at http://localhost:4173, operations dashboard at http://l
 
 `make demo` builds and starts the Compose stack in the background, then opens the dashboard. Volunteer accounts can use `/field`. To run synthetic M4 comparisons, use `make simulate SCENARIO=urban_flood` (or `rural_isolation`, `medical_surge`, or `all`). Reports are written under `reports/<scenario>/<phone-count>/` as CSV, JSON, SVG, and Markdown for 500, 5,000, and 20,000 phones across ten seeds and all three approaches.
 
+For sync ingestion load, start the API stack and run `make k6-sync`. It generates 60,000 synthetic signed sync bundles, then targets 1,000 `POST /api/v1/sync` requests per second for 60 seconds. Set `BASE_URL`, `EVENTS_PER_SECOND`, `DURATION`, or `EVENTS` to change the target; k6 writes raw results under `reports/k6-sync/`. The run reports measured capacity and may fail its 1% error / 1 s p95 thresholds on small machines.
+
 ## Checks
 
 ```powershell

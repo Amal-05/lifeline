@@ -115,7 +115,15 @@ def sync(bundle: SyncBundle) -> SyncResponse:
             accepted.append(event.event_id)
         session.commit()
         known = set(bundle.known_event_ids) | {event.event_id for event in bundle.events if event.event_id in accepted}
-        missing = session.scalars(select(EventRecord).where(~EventRecord.event_id.in_(known))).all() if known else session.scalars(select(EventRecord)).all()
+        missing_query = select(EventRecord)
+        if known:
+            missing_query = missing_query.where(~EventRecord.event_id.in_(known))
+        for device_id, highest_hlc in bundle.highest_hlc_by_device.items():
+            if len(device_id) <= 128 and len(highest_hlc) <= 80:
+                missing_query = missing_query.where(
+                    (EventRecord.device_id != device_id) | (EventRecord.hlc > highest_hlc)
+                )
+        missing = session.scalars(missing_query).all()
         missing_events = [
             {"protocol_version": 1, "event_id": row.event_id, "device_id": row.device_id,
              "hlc": row.hlc, "type": row.event_type, "request_id": row.request_id,

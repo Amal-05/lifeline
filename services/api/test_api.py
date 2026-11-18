@@ -3,7 +3,12 @@ from nacl.signing import SigningKey
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from packages.protocol.python.lifeline_protocol import SyncBundle, sign_event
+from packages.protocol.python.lifeline_protocol import (
+    HybridLogicalClock,
+    SyncBundle,
+    new_ulid,
+    sign_event,
+)
 from services.api import main
 from services.api.db import Base
 
@@ -44,6 +49,21 @@ def test_sync_returns_remote_events_not_already_known(api_db):
     assert main.sync(empty).missing_events[0]["event_id"] == event.event_id
     known = SyncBundle(events=[], known_event_ids=[event.event_id])
     assert main.sync(known).missing_events == []
+
+
+def test_sync_uses_per_origin_highest_hlc_to_avoid_retransmitting_known_prefix(api_db):
+    key = SigningKey.generate()
+    clock = HybridLogicalClock("device", wall_ms=1767225600000)
+    first = sign_event({"event_id": new_ulid(), "hlc": clock.tick(1767225600000), "type": "sos.created",
+                        "request_id": new_ulid(), "payload": {}, "hops": 0}, key)
+    second = sign_event({"event_id": new_ulid(), "hlc": clock.tick(1767225601000), "type": "sos.created",
+                         "request_id": new_ulid(), "payload": {}, "hops": 0}, key)
+    main.sync(SyncBundle(events=[first, second]))
+    inventory = SyncBundle(events=[], highest_hlc_by_device={first.device_id: first.hlc})
+    response = main.sync(inventory)
+    assert [event["event_id"] for event in response.missing_events] == [second.event_id]
+    complete = SyncBundle(events=[], highest_hlc_by_device={first.device_id: second.hlc})
+    assert main.sync(complete).missing_events == []
 
 
 def test_media_id_is_content_derived():
