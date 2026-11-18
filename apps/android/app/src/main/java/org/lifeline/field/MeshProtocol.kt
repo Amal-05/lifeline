@@ -3,7 +3,6 @@ package org.lifeline.field
 import org.json.JSONObject
 import java.security.MessageDigest
 import java.util.Base64
-import java.security.MessageDigest
 import java.util.ArrayDeque
 
 data class RelayFrame(val event: String, val hops: Int, val ttl: Int = 12) {
@@ -135,8 +134,8 @@ class InventoryBloomFilter(private val bitCount: Int = 2048, private val hashCou
     init { require(bitCount >= 64 && hashCount in 1..8 && bits.size == (bitCount + 7) / 8) }
     private fun indexes(value: String): List<Int> {
         val digest = MessageDigest.getInstance("SHA-256").digest(value.toByteArray())
-        val first = java.nio.ByteBuffer.wrap(digest, 0, 8).long
-        val second = java.nio.ByteBuffer.wrap(digest, 8, 8).long or 1L
+        val first = java.nio.ByteBuffer.wrap(digest).getLong(0)
+        val second = java.nio.ByteBuffer.wrap(digest).getLong(8) or 1L
         return (0 until hashCount).map { Math.floorMod(first + it * second, bitCount.toLong()).toInt() }
     }
     fun add(value: String) { indexes(value).forEach { bits[it / 8] = (bits[it / 8].toInt() or (1 shl (it % 8))).toByte() } }
