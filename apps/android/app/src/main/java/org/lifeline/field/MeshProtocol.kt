@@ -3,6 +3,8 @@ package org.lifeline.field
 import org.json.JSONObject
 import java.security.MessageDigest
 import java.util.Base64
+import java.security.MessageDigest
+import java.util.ArrayDeque
 
 data class RelayFrame(val event: String, val hops: Int, val ttl: Int = 12) {
     fun encode(): ByteArray {
@@ -62,11 +64,107 @@ class ChunkAssembler(private val maximumBytes: Int = 20 * 1024 * 1024) {
 }
 
 class RelayLedger(private val maximumEvents: Int = 5000, private val maximumBytes: Int = 20 * 1024 * 1024) {
-    private val events = LinkedHashMap<String, Int>()
-    val byteCount: Int get() = events.values.sum()
-    fun accept(eventId: String, size: Int): Boolean {
-        if (eventId in events || size !in 1..maximumBytes || events.size >= maximumEvents || byteCount + size > maximumBytes) return false
-        events[eventId] = size
+    data class Stored(val eventId: String, val size: Int, val priority: Int, val createdAtMillis: Long,
+                      val delivered: Boolean, val ownUndeliveredSos: Boolean, val signedEvent: String,
+                      val hops: Int, val ttl: Int)
+    private val events = LinkedHashMap<String, Stored>()
+    val byteCount: Int get() = events.values.sumOf { it.size }
+    fun accept(eventId: String, size: Int, priority: Int = 0, createdAtMillis: Long = System.currentTimeMillis(),
+               delivered: Boolean = false, ownUndeliveredSos: Boolean = false, signedEvent: String = "",
+               hops: Int = 0, ttl: Int = 12): Boolean {
+        if (eventId in events || size !in 1..maximumBytes || priority !in 0..4 || hops !in 0..12 || ttl !in 0..12) return false
+        while (events.size >= maximumEvents || byteCount + size > maximumBytes) {
+            val victim = events.values.filterNot { it.ownUndeliveredSos }
+                .minWithOrNull(compareBy<Stored> { if (it.delivered) 0 else 1 }.thenBy { it.priority }.thenBy { it.createdAtMillis })
+                ?: return false
+            events.remove(victim.eventId)
+        }
+        events[eventId] = Stored(eventId, size, priority, createdAtMillis, delivered, ownUndeliveredSos, signedEvent, hops, ttl)
+        return true
+    }
+    fun ids(): Set<String> = events.keys.toSet()
+    fun stored(): List<Stored> = events.values.toList()
+    fun markDelivered(eventId: String) { events[eventId]?.let { events[eventId] = it.copy(delivered = true) } }
+    fun encode(): String = org.json.JSONArray().also { json -> events.values.forEach { event ->
+        json.put(JSONObject().put("event_id", event.eventId).put("size", event.size)
+            .put("priority", event.priority).put("created_at", event.createdAtMillis)
+            .put("delivered", event.delivered).put("own_undelivered_sos", event.ownUndeliveredSos)
+            .put("signed_event", event.signedEvent).put("hops", event.hops).put("ttl", event.ttl))
+    } }.toString()
+    fun restore(encoded: String) {
+        runCatching {
+            val rows = org.json.JSONArray(encoded)
+            for (index in 0 until rows.length()) {
+                val row = rows.getJSONObject(index)
+                accept(row.getString("event_id"), row.getInt("size"), row.getInt("priority"),
+                    row.getLong("created_at"), row.getBoolean("delivered"),
+                    row.getBoolean("own_undelivered_sos"), row.getString("signed_event"),
+                    row.optInt("hops", 0), row.optInt("ttl", 12))
+            }
+        }
+    }
+}
+
+data class PeerHello(
+    val protocolVersion: Int,
+    val deviceId: String,
+    val batteryPct: Int,
+    val internet: Boolean,
+    val inventoryBloom: String,
+    val highestHlcByOrigin: Map<String, String>,
+) {
+    fun encode(): ByteArray = JSONObject().put("kind", "hello").put("protocol_version", protocolVersion)
+        .put("device_id", deviceId).put("battery_pct", batteryPct).put("internet", internet)
+        .put("inventory_bloom", inventoryBloom).put("highest_hlc_by_origin", JSONObject(highestHlcByOrigin))
+        .toString().toByteArray()
+
+    companion object {
+        fun decode(bytes: ByteArray): PeerHello = JSONObject(bytes.decodeToString()).let { json ->
+            require(json.getString("kind") == "hello")
+            val hlc = mutableMapOf<String, String>()
+            val input = json.getJSONObject("highest_hlc_by_origin")
+            input.keys().forEach { key -> hlc[key] = input.getString(key) }
+            PeerHello(json.getInt("protocol_version"), json.getString("device_id"),
+                json.getInt("battery_pct"), json.getBoolean("internet"), json.getString("inventory_bloom"), hlc)
+        }
+    }
+}
+
+class InventoryBloomFilter(private val bitCount: Int = 2048, private val hashCount: Int = 4, encoded: String? = null) {
+    private val bits = if (encoded == null) ByteArray((bitCount + 7) / 8) else Base64.getUrlDecoder().decode(encoded)
+    init { require(bitCount >= 64 && hashCount in 1..8 && bits.size == (bitCount + 7) / 8) }
+    private fun indexes(value: String): List<Int> {
+        val digest = MessageDigest.getInstance("SHA-256").digest(value.toByteArray())
+        val first = java.nio.ByteBuffer.wrap(digest, 0, 8).long
+        val second = java.nio.ByteBuffer.wrap(digest, 8, 8).long or 1L
+        return (0 until hashCount).map { Math.floorMod(first + it * second, bitCount.toLong()).toInt() }
+    }
+    fun add(value: String) { indexes(value).forEach { bits[it / 8] = (bits[it / 8].toInt() or (1 shl (it % 8))).toByte() } }
+    fun mightContain(value: String): Boolean = indexes(value).all { (bits[it / 8].toInt() and (1 shl (it % 8))) != 0 }
+    fun encode(): String = Base64.getUrlEncoder().withoutPadding().encodeToString(bits)
+}
+
+data class BatteryRelayPolicy(val scanWindowMillis: Long?, val scanIntervalMillis: Long?, val relayOtherEvents: Boolean) {
+    fun mayRelay(isOwnSos: Boolean): Boolean = relayOtherEvents || isOwnSos
+    companion object {
+        fun forBattery(percent: Int): BatteryRelayPolicy {
+            require(percent in 0..100)
+            return when {
+                percent < 10 -> BatteryRelayPolicy(null, null, false)
+                percent < 30 -> BatteryRelayPolicy(10_000, 60_000, true)
+                else -> BatteryRelayPolicy(null, null, true)
+            }
+        }
+    }
+}
+
+class EventRateLimiter(private val maximum: Int = 10, private val windowMillis: Long = 60_000) {
+    private val arrivals = mutableMapOf<String, ArrayDeque<Long>>()
+    fun allow(origin: String, nowMillis: Long): Boolean {
+        val times = arrivals.getOrPut(origin) { ArrayDeque() }
+        while (times.isNotEmpty() && nowMillis - times.first() >= windowMillis) times.removeFirst()
+        if (times.size >= maximum) return false
+        times.addLast(nowMillis)
         return true
     }
 }
