@@ -30,3 +30,4 @@
 - 2026-11-18: Volunteer assignment reads are scoped to the volunteer's team; coordinator/admin field views may inspect all assignments. Field responses include only incident routing and response fields needed to act on the assignment.
 - 2026-11-18: Volunteer field mode caches assignment cards locally and queues status updates while offline; queued status changes replay when connectivity returns. Third-party map navigation is an optional online link, while coordinates remain visible for offline field use.
 - 2026-11-18: M4 simulation models three seeded connectivity approaches and scales with 500, 5,000, and 20,000 phones. It emits reproducible synthetic comparisons; connectivity and workload rates are scenario assumptions, not field-calibrated claims.
+- 2026-11-18: Incident detail and recommended assignment flows use existing authorized incident and resource-matching APIs; assignment still follows the API's suggestion then explicit confirmation step.
