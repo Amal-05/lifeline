@@ -4,7 +4,7 @@ The Android app provides offline SOS capture, signed event storage and sync, cac
 
 ## Build and run
 
-Open `apps/android` in Android Studio with Android SDK 36 installed, then run the `app` configuration on an emulator or Android device. The project uses Gradle Kotlin DSL; Android Studio can create the local Gradle wrapper on first open. From an environment with Gradle installed, run:
+Open `apps/android` in Android Studio with Android SDK 36 installed, configure Gradle JDK 17, then run the `app` configuration on an emulator or Android device. A Gradle wrapper is not checked in yet. From an environment with Gradle 8.14.3 and Android SDK 36 installed, run:
 
 ```sh
 gradle -p apps/android testDebugUnitTest assembleDebug
