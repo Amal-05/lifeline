@@ -17,6 +17,7 @@ from services.api.auth import router as auth_router
 from services.api.dashboard import router as dashboard_router
 from services.api.db import Base, SessionLocal, engine
 from services.api.models import EventRecord
+from services.api.payload_crypto import coordinator_public_key, open_event_payload
 from services.api.risk import router as risk_router
 
 
@@ -101,7 +102,8 @@ def sync(bundle: SyncBundle) -> SyncResponse:
         for event in bundle.events:
             try:
                 verify_event(event)
-            except ValueError as exc:
+                open_event_payload(event.payload)
+            except (TypeError, ValueError) as exc:
                 rejected.append({"event_id": event.event_id, "reason": str(exc)})
                 continue
             if session.get(EventRecord, event.event_id) is None:
@@ -162,4 +164,5 @@ def request_status(request_id: str) -> dict[str, str]:
 
 @app.get(f"{API_PREFIX}/config")
 def config() -> dict[str, Any]:
-    return {"language_bundles_version": "1", "map_tile_urls": [], "feature_flags": {"offline_sos": True}, "server_time": datetime.now(UTC)}
+    return {"language_bundles_version": "1", "map_tile_urls": [], "feature_flags": {"offline_sos": True},
+            "coordinator_public_key": coordinator_public_key(), "server_time": datetime.now(UTC)}

@@ -4,6 +4,9 @@ import android.content.Context
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import android.util.AtomicFile
+import com.goterl.lazysodium.LazySodiumAndroid
+import com.goterl.lazysodium.SodiumAndroid
+import com.goterl.lazysodium.interfaces.Box
 import org.bouncycastle.crypto.params.Ed25519PrivateKeyParameters
 import org.bouncycastle.crypto.signers.Ed25519Signer
 import org.json.JSONArray
@@ -37,6 +40,7 @@ class LocalEventIdentity(context: Context) {
         note: String,
         latitude: Double?,
         longitude: Double?,
+        coordinatorPublicKey: String?,
     ): JSONObject {
         require(peopleCount in 1..100)
         require(category in setOf("medical", "trapped", "food", "evacuation", "missing", "other"))
@@ -55,7 +59,7 @@ class LocalEventIdentity(context: Context) {
             .put("location", location)
         val fields = JSONObject().put("protocol_version", 1).put("event_id", newUlid()).put("device_id", deviceId)
             .put("hlc", hlc).put("type", "sos.created").put("request_id", requestId)
-            .put("payload", payload).put("hops", 0)
+            .put("payload", coordinatorPublicKey?.let { sealPayload(payload, it) } ?: payload).put("hops", 0)
         val signer = Ed25519Signer()
         signer.init(true, signingKey)
         val canonical = canonicalJson(fields).toByteArray(Charsets.UTF_8)
@@ -63,6 +67,19 @@ class LocalEventIdentity(context: Context) {
         val signature = Base64.getUrlEncoder().withoutPadding().encodeToString(signer.generateSignature())
         fields.put("signature", signature)
         return fields
+    }
+
+    private fun sealPayload(payload: JSONObject, encodedPublicKey: String): JSONObject {
+        val publicKey = Base64.getUrlDecoder().decode(encodedPublicKey)
+        require(publicKey.size == Box.PUBLICKEYBYTES) { "Coordinator public key must be 32 bytes" }
+        val plaintext = payload.toString().toByteArray(Charsets.UTF_8)
+        val ciphertext = ByteArray(plaintext.size + Box.SEALBYTES)
+        check(LazySodiumAndroid(SodiumAndroid()).cryptoBoxSeal(ciphertext, plaintext, plaintext.size.toLong(), publicKey)) {
+            "Could not encrypt SOS payload for the coordinator"
+        }
+        return JSONObject().put("_sealed_payload", JSONObject().put("version", 1)
+            .put("algorithm", "libsodium-sealed-box-v1")
+            .put("ciphertext", Base64.getUrlEncoder().withoutPadding().encodeToString(ciphertext)))
     }
 
     private fun nextHlc(): String {

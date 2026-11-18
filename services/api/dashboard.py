@@ -32,6 +32,7 @@ from services.api.models import (
     Team,
     User,
 )
+from services.api.payload_crypto import open_event_payload
 from services.api.security import decode_token, require_roles
 from services.triage.algorithms import (
     ResourceCluster,
@@ -296,7 +297,8 @@ def incident_detail(incident_id: str, session: SessionDep, _user: IncidentReader
             for row in requests
         ],
         "timeline": [
-            {"event_id": event.event_id, "type": event.event_type, "hlc": event.hlc, "payload": json.loads(event.payload)}
+            {"event_id": event.event_id, "type": event.event_type, "hlc": event.hlc,
+             "payload": open_event_payload(json.loads(event.payload))}
             for event in events
         ],
         "merge_candidates": [

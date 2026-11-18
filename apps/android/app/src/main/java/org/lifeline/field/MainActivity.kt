@@ -92,6 +92,7 @@ class MainActivity : ComponentActivity() {
     private val deviceId by lazy { identity.deviceId }
     private var apiBase by mutableStateOf(getPreferences(MODE_PRIVATE).getString("api_base", DEFAULT_API) ?: DEFAULT_API)
     private var accessToken by mutableStateOf("")
+    private var coordinatorPublicKey by mutableStateOf(getPreferences(MODE_PRIVATE).getString("coordinator_public_key", "") ?: "")
     private var connected by mutableStateOf(false)
     private var working by mutableStateOf(false)
     private var notice by mutableStateOf("")
@@ -100,6 +101,8 @@ class MainActivity : ComponentActivity() {
     private var queuedCount by mutableIntStateOf(0)
     private var scanWindow: Runnable? = null
     private var scanCycle: Runnable? = null
+    private var linkRotation: Runnable? = null
+    private var meshActive = false
     private val pendingAssignments = AtomicFile(File(filesDir, "lifeline-assignment-updates.json"))
     private val cachedAssignments = AtomicFile(File(filesDir, "lifeline-assignments.json"))
 
@@ -124,18 +127,18 @@ class MainActivity : ComponentActivity() {
                     val hello = PeerHello.decode(complete)
                     if (hello.protocolVersion != 1) return
                     val inventory = InventoryBloomFilter(encoded = hello.inventoryBloom)
-                    ledger.stored().filter { !inventory.mightContain(it.eventId) && it.ttl > 0 && it.hops < 12 }
-                        .forEach { sendEvent(endpointId, RelayFrame(it.signedEvent, it.hops, it.ttl).encode()) }
+                    ledger.stored().filter { !inventory.mightContain(it.eventId) && it.ttl > 0 && it.hops < 12 && isMeshSafe(it.signedEvent) }
+                        .forEach { sendEvent(endpointId, RelayFrame(it.signedEvent, it.hops, it.ttl, it.priority.coerceAtMost(3)).encode()) }
                     return
                 }
                 val frame = MeshProtocol.decode(complete)
                 val envelope = JSONObject(frame.event)
-                if (!EventSignatureVerifier.verify(envelope)) return
+                if (!EventSignatureVerifier.verify(envelope) || !isMeshSafe(envelope)) return
                 val origin = envelope.getString("device_id")
                 if (!BatteryRelayPolicy.forBattery(batteryPercent()).mayRelay(origin == identityDeviceId())) return
                 if (!rateLimiter.allow(origin, System.currentTimeMillis())) return
                 val id = envelope.getString("event_id")
-                val accepted = ledger.accept(id, frame.event.toByteArray().size, eventPriority(envelope),
+                val accepted = ledger.accept(id, frame.event.toByteArray().size, frame.priorityHint,
                     ownUndeliveredSos = false, signedEvent = frame.event, hops = frame.hops, ttl = frame.ttl)
                 if (accepted) {
                     persistLedger()
@@ -166,7 +169,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private val connectivityCallback = object : ConnectivityManager.NetworkCallback() {
-        override fun onAvailable(network: Network) { runOnUiThread { connected = true; syncAndRefresh() } }
+        override fun onAvailable(network: Network) { runOnUiThread { connected = true; refreshCoordinatorKey(); syncAndRefresh() } }
         override fun onLost(network: Network) { runOnUiThread { connected = internetAvailable() } }
     }
 
@@ -189,11 +192,23 @@ class MainActivity : ComponentActivity() {
                     onAssignmentStatus = ::updateAssignment,
                 )
             }
-        if (connected) syncAndRefresh()
         }
+        if (connected) { refreshCoordinatorKey(); syncAndRefresh() }
     }
 
     private fun identityDeviceId(): String = identity.deviceId
+
+    private fun refreshCoordinatorKey() {
+        if (!connected) return
+        lifecycleScope.launch {
+            runCatching { JSONObject(apiRequest("/config", "GET", null, false)).optString("coordinator_public_key") }
+                .onSuccess { value ->
+                    coordinatorPublicKey = value.takeUnless { it.isBlank() || it == "null" }.orEmpty()
+                    getPreferences(MODE_PRIVATE).edit().putString("coordinator_public_key", coordinatorPublicKey).apply()
+                }
+                .onFailure { notice = "Coordinator encryption key could not be refreshed; mesh relay is unavailable until it is cached." }
+        }
+    }
 
     private fun login(email: String, password: String) {
         lifecycleScope.launch {
@@ -215,7 +230,8 @@ class MainActivity : ComponentActivity() {
 
     private fun saveSos(people: Int, category: String, needs: List<String>, note: String, latitude: Double?, longitude: Double?) {
         runCatching {
-            val event = identity.createSos(people, category, needs, note, latitude, longitude)
+            val event = identity.createSos(people, category, needs, note, latitude, longitude,
+                coordinatorPublicKey.takeIf { it.isNotBlank() })
             val text = event.toString()
             val id = event.getString("event_id")
             val urgent = category in setOf("medical", "trapped") || needs.any { it in setOf("bedridden", "infant", "disabled") }
@@ -224,7 +240,8 @@ class MainActivity : ComponentActivity() {
             persistLedger()
             broadcastQueuedEvents()
             refreshQueuedCount()
-            notice = "SOS saved on this phone and queued for sync."
+            notice = if (isMeshSafe(event)) "SOS encrypted for the coordinator and saved on this phone."
+                else "SOS saved on this phone; mesh relay needs a cached coordinator key."
             if (connected) syncAndRefresh()
         }.onFailure { notice = "Could not save SOS: ${it.message ?: "Please retry."}" }
     }
@@ -352,6 +369,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun startMesh() {
+        if (meshActive) return
         val required = if (android.os.Build.VERSION.SDK_INT >= 33) arrayOf(
             Manifest.permission.BLUETOOTH_ADVERTISE, Manifest.permission.BLUETOOTH_CONNECT,
             Manifest.permission.BLUETOOTH_SCAN, Manifest.permission.NEARBY_WIFI_DEVICES,
@@ -360,11 +378,14 @@ class MainActivity : ComponentActivity() {
         if (missing.isNotEmpty()) { requestPermissions(missing.toTypedArray(), 73); return }
         val client = Nearby.getConnectionsClient(this)
         client.startAdvertising("L1-${deviceId.take(8)}", serviceId, connectionLifecycle, AdvertisingOptions.Builder().setStrategy(strategy).build())
+        meshActive = true
         startDiscovery()
+        scheduleLinkRotation()
         meshStatus = "Discovering nearby peers"
     }
     private fun stopMesh() {
-        scanWindow?.let(handler::removeCallbacks); scanCycle?.let(handler::removeCallbacks)
+        meshActive = false
+        scanWindow?.let(handler::removeCallbacks); scanCycle?.let(handler::removeCallbacks); linkRotation?.let(handler::removeCallbacks)
         Nearby.getConnectionsClient(this).stopAdvertising(); Nearby.getConnectionsClient(this).stopDiscovery()
         Nearby.getConnectionsClient(this).stopAllEndpoints(); connections.clear(); meshStatus = "Mesh is stopped"
     }
@@ -403,8 +424,8 @@ class MainActivity : ComponentActivity() {
         else EventChunker.split(java.util.UUID.randomUUID().toString(), bytes).forEach { client.sendPayload(endpointId, Payload.fromBytes(it.encode())) }
     }
     private fun broadcastQueuedEvents() {
-        ledger.stored().filter { !it.delivered }.forEach { stored ->
-            val frame = RelayFrame(stored.signedEvent, stored.hops, stored.ttl).encode()
+        ledger.stored().filter { !it.delivered && isMeshSafe(it.signedEvent) }.forEach { stored ->
+            val frame = RelayFrame(stored.signedEvent, stored.hops, stored.ttl, stored.priority.coerceAtMost(3)).encode()
             connections.forEach { endpoint -> sendEvent(endpoint, frame) }
         }
     }
@@ -420,6 +441,10 @@ class MainActivity : ComponentActivity() {
         return if (urgent) 4 else 3
     }
 
+    private fun isMeshSafe(signedEvent: String): Boolean = runCatching { isMeshSafe(JSONObject(signedEvent)) }.getOrDefault(false)
+    private fun isMeshSafe(event: JSONObject): Boolean = event.optJSONObject("payload")?.optJSONObject("_sealed_payload")
+        ?.optString("algorithm") == "libsodium-sealed-box-v1"
+
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grants: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grants)
         if (requestCode == 73 && grants.isNotEmpty() && grants.all { it == android.content.pm.PackageManager.PERMISSION_GRANTED }) startMesh()
@@ -432,6 +457,21 @@ class MainActivity : ComponentActivity() {
         runCatching { connectivity.unregisterNetworkCallback(connectivityCallback) }
         stopMesh()
         super.onDestroy()
+    }
+
+    private fun scheduleLinkRotation() {
+        linkRotation?.let(handler::removeCallbacks)
+        val rotate = Runnable {
+            if (meshActive) {
+                Nearby.getConnectionsClient(this).stopDiscovery()
+                connections.toList().forEach { Nearby.getConnectionsClient(this).disconnectFromEndpoint(it) }
+                connections.clear()
+                startDiscovery()
+                scheduleLinkRotation()
+            }
+        }
+        linkRotation = rotate
+        handler.postDelayed(rotate, 60_000)
     }
 }
 
@@ -560,8 +600,8 @@ private fun AssignmentsScreen(assignments: List<JSONObject>, online: Boolean, mo
 private fun MeshScreen(status: String, modifier: Modifier, onJoin: () -> Unit, onStop: () -> Unit) {
     Column(modifier.fillMaxSize().padding(24.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
         Text("Nearby mesh", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-        Text("$status · up to four peers · signed events only")
-        Text("When a device with Internet joins the mesh, it can forward queued signed SOS events to the server.")
+        Text("$status · up to four peers · signed and encrypted SOS only")
+        Text("Connect to the gateway once to cache its public encryption key. A device with Internet can upload the shared SOS pool and return delivery receipts to peers.")
         Button(onClick = onJoin, modifier = Modifier.fillMaxWidth()) { Text("Join nearby mesh") }
         OutlinedButton(onClick = onStop, modifier = Modifier.fillMaxWidth()) { Text("Stop mesh") }
     }

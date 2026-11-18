@@ -5,13 +5,16 @@ import java.security.MessageDigest
 import java.util.Base64
 import java.util.ArrayDeque
 
-data class RelayFrame(val event: String, val hops: Int, val ttl: Int = 12) {
+data class RelayFrame(val event: String, val hops: Int, val ttl: Int = 12, val priorityHint: Int = 1) {
+    init { require(hops in 0..12 && ttl in 0..12 && priorityHint in 0..3) }
     fun encode(): ByteArray {
-        require(hops in 0..12 && ttl in 0..12)
-        return JSONObject().put("event", event).put("hops", hops).put("ttl", ttl).toString().toByteArray()
+        return JSONObject().put("event", event).put("hops", hops).put("ttl", ttl)
+            .put("priority_hint", priorityHint).toString().toByteArray()
     }
     fun relay(): RelayFrame? = if (ttl <= 0 || hops >= 12) null else copy(hops = hops + 1, ttl = ttl - 1)
-    companion object { fun decode(bytes: ByteArray) = JSONObject(bytes.decodeToString()).let { RelayFrame(it.getString("event"), it.getInt("hops"), it.optInt("ttl", 12)) } }
+    companion object { fun decode(bytes: ByteArray) = JSONObject(bytes.decodeToString()).let {
+        RelayFrame(it.getString("event"), it.getInt("hops"), it.optInt("ttl", 12), it.optInt("priority_hint", 1))
+    } }
 }
 
 data class DeliveredReceipt(val eventIds: Set<String>) {

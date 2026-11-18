@@ -2,7 +2,7 @@
 
 ## Configuration
 
-Run Compose only for local demo. Production requires managed PostgreSQL/PostGIS and Redis, TLS termination, restricted network ingress, pinned image digests, non-root containers, resource limits, database backups, monitoring, and a secret manager. Set `JWT_SECRET_KEY`, `REGISTRY_ENCRYPTION_KEY`, `DEMO_MODE=false`, and disable demo user seeding. Generate independent random keys and retain encrypted recovery copies under two-person control. Do not use `.env.example` values outside synthetic local demos.
+Run Compose only for local demo. Production requires managed PostgreSQL/PostGIS and Redis, TLS termination, restricted network ingress, pinned image digests, non-root containers, resource limits, database backups, monitoring, and a secret manager. Set `JWT_SECRET_KEY`, `REGISTRY_ENCRYPTION_KEY`, `COORDINATOR_SECRET_KEY`, `DEMO_MODE=false`, and disable demo user seeding. The API and worker must receive the same coordinator secret key; the API derives and publishes its sealed-box public key through `/api/v1/config`. Generate independent random keys and retain encrypted recovery copies under two-person control. Keep the coordinator key available until devices using its cached public key have synced; this protocol version does not support overlapping key generations. Do not use `.env.example` values outside synthetic local demos.
 
 ## Startup and health
 

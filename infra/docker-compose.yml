@@ -32,6 +32,7 @@ services:
       DEMO_ADMIN_EMAIL: ${DEMO_ADMIN_EMAIL:-coordinator@example.com}
       DEMO_ADMIN_PASSWORD: ${DEMO_ADMIN_PASSWORD:-demo-only-change-me}
       REGISTRY_ENCRYPTION_KEY: ${REGISTRY_ENCRYPTION_KEY:-lifeline-synthetic-demo-key-replace-before-deploy}
+      COORDINATOR_SECRET_KEY: ${COORDINATOR_SECRET_KEY:-}
     ports: ["8000:8000"]
     depends_on:
       db: {condition: service_healthy}
@@ -45,6 +46,7 @@ services:
       DATABASE_URL: postgresql+psycopg://lifeline:lifeline@db:5432/lifeline
       REDIS_URL: redis://redis:6379/0
       JWT_SECRET_KEY: ${JWT_SECRET_KEY:-local-dev-secret-change-before-deploy}
+      COORDINATOR_SECRET_KEY: ${COORDINATOR_SECRET_KEY:-}
     depends_on:
       db: {condition: service_healthy}
       redis: {condition: service_healthy}

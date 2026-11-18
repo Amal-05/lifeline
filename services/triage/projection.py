@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from packages.protocol.python.lifeline_protocol import new_ulid
 from services.api.models import EventRecord, Incident, MergeCandidate, RequestProjection
+from services.api.payload_crypto import open_event_payload
 from services.triage.algorithms import (
     MergeDecision,
     RequestSignal,
@@ -145,13 +146,14 @@ def project_request_events(session: Session, request_id: str) -> RequestProjecti
     if not records:
         return None
     events = [
-        {"hlc": row.hlc, "device_id": row.device_id, "type": row.event_type, "request_id": row.request_id, "payload": json.loads(row.payload)}
+        {"hlc": row.hlc, "device_id": row.device_id, "type": row.event_type, "request_id": row.request_id,
+         "payload": open_event_payload(json.loads(row.payload))}
         for row in records
     ]
     data = replay_request_events(events)
     created_hlc = str(data.get("created_hlc") or records[0].hlc)
     created_at = parse_hlc(created_hlc)
-    payload = json.loads(next(row.payload for row in records if row.event_type == "sos.created"))
+    payload = open_event_payload(json.loads(next(row.payload for row in records if row.event_type == "sos.created")))
     loc = payload.get("location") or {}
     original = str(data.get("text_original") or "")
     language = str(data.get("language") or detect_language(original))
@@ -278,11 +280,11 @@ def process_event_record(session: Session, record: EventRecord) -> Incident | No
         return triage_request(session, row)
     if record.event_type == "sos.ping":
         row.last_contact_at = datetime.now(UTC)
-        state = json.loads(record.payload).get("state")
+        state = open_event_payload(json.loads(record.payload)).get("state")
         if state == "safe":
             row.status = "safe"
     if record.event_type == "status.changed":
-        row.status = json.loads(record.payload).get("status", row.status)
+        row.status = open_event_payload(json.loads(record.payload)).get("status", row.status)
     incident = session.get(Incident, row.incident_id) if row.incident_id else None
     if incident is None and row.incident_id:
         incident = _new_incident(row)

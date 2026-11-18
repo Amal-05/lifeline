@@ -61,6 +61,14 @@ class RelayLedgerTest {
         assertTrue(ledger.stored().single().delivered)
     }
 
+    @Test fun relayFramePreservesCoarsePriorityOutsideSignedEvent() {
+        val sent = RelayFrame("{signed}", hops = 2, ttl = 10, priorityHint = 3)
+        val received = RelayFrame.decode(sent.encode()).relay()
+        assertEquals(3, received?.priorityHint)
+        assertEquals(3, received?.hops)
+        assertEquals(9, received?.ttl)
+    }
+
     @Test fun oneHundredNodeKotlinMeshHarnessConvergesWithinHopLimit() {
         val nodes = List(100) { RelayLedger() }
         val neighbors = List(100) { index ->
