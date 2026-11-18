@@ -19,6 +19,10 @@ test("offline SOS survives reload and syncs exactly once", async ({ page, contex
   await context.setOffline(false);
   await expect.poll(() => posts).toBe(1);
   await expect(page.getByText(/Received · 2/)).toBeVisible();
+  await page.getByRole("button", { name: "Still need help" }).click();
+  await expect.poll(() => posts).toBe(2);
+  await page.getByRole("button", { name: "We are safe" }).click();
+  await expect.poll(() => posts).toBe(3);
   await page.reload();
-  await expect.poll(() => posts).toBe(1);
+  await expect.poll(() => posts).toBe(3);
 });

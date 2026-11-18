@@ -22,3 +22,11 @@ def _box() -> SecretBox:
 
 def encrypt_registration(value: bytes) -> str:
     return base64.urlsafe_b64encode(bytes(_box().encrypt(value))).decode()
+
+
+def decrypt_registration(value: str) -> bytes:
+    try:
+        encrypted = base64.urlsafe_b64decode(value.encode())
+        return _box().decrypt(encrypted)
+    except Exception as exc:
+        raise ValueError("Household registration cannot be decrypted") from exc

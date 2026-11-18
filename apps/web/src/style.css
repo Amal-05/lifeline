@@ -3,3 +3,7 @@
 .table-wrap{overflow:auto;margin-block:1rem}table{border-collapse:collapse;width:100%;min-width:760px}th,td{text-align:left;padding:.75rem;border-bottom:1px solid #d6dde2;vertical-align:top}th{font-size:.85rem;color:#344955;background:#f2f6f7;position:sticky;top:0}.dashboard{max-width:1200px}.dashboard header{display:flex;align-items:center;justify-content:space-between}.dashboard td:first-child{color:#a43122}.dashboard form{max-width:30rem;display:grid;gap:1rem}.dashboard input{display:block;width:100%;padding:.8rem}
 .risk-map{display:block;width:min(100%,640px);height:auto;background:#e9f0ed;border:1px solid #b4c5bc;border-radius:12px}.risk-map text{font-size:12px;font-weight:700;fill:white;paint-order:stroke;stroke:#263d37;stroke-width:2px;stroke-linejoin:round}
 .review-card{border:1px solid #d6dde2;border-radius:10px;padding:1rem;margin-block:.75rem}.review-card button+button{margin-inline-start:.5rem}
+.followup-actions{display:inline-flex;flex-wrap:wrap;gap:.5rem;margin:.5rem 0 0 .75rem}.followup-actions button{min-height:48px}
+.incident-filters{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:1rem;align-items:end}.incident-filters label{display:grid;gap:.4rem}.incident-filters button{min-height:48px}
+.household-actions{display:flex;flex-wrap:wrap;gap:.5rem}
+.field-status{display:flex;flex-wrap:wrap;gap:.5rem;margin-top:1rem}.field-status button{min-width:120px;text-transform:capitalize}

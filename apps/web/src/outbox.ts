@@ -21,6 +21,14 @@ export async function queueSOS(input:Omit<SOS,"event_id"|"request_id"|"created_a
   const event=await signEvent({event_id,hlc:clock.tick(Date.parse(created_at)),type:"sos.created",request_id,payload:{people_count:input.people_count,categories:input.categories,special_needs:input.special_needs,text_original:input.text_original,location:{latitude:input.latitude,longitude:input.longitude,accuracy_m:input.accuracy_m,source:input.location_source}},hops:0},key.private_key);
   const record:SOS={...input,event_id,request_id,created_at,hlc:event.hlc,event,state:"queued"};await db.outbox.add(record);return record;
 }
+export async function queueFollowup(original:SOS,state:"still_needs_help"|"safe"):Promise<SOS>{
+  const created_at=new Date().toISOString(),event_id=ulid(),key=await identity();
+  const clock=new HybridLogicalClock(key.device_id.slice(0,8),Date.parse(created_at));
+  const event=await signEvent({event_id,hlc:clock.tick(Date.parse(created_at)),type:"sos.ping",request_id:original.request_id,payload:{state},hops:0},key.private_key);
+  const record:SOS={...original,event_id,created_at,hlc:event.hlc,event,state:"queued"};
+  delete (record as Partial<SOS>).photo;delete (record as Partial<SOS>).voice;
+  await db.outbox.add(record);return record;
+}
 export async function syncOutbox(baseUrl:string):Promise<number>{
   if(!navigator.onLine)return 0;const pending=await db.outbox.where("state").equals("queued").toArray();let synced=0;
   for(const item of pending){

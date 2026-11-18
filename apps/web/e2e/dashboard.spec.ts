@@ -11,6 +11,10 @@ test("coordinator can view synthetic risk map and encrypted registration", async
   await page.getByLabel("I consent to secure storage of this household registration.").check();
   await page.getByRole("button", { name: "Encrypt and register" }).click();
   await expect(page.getByRole("status")).toContainText("Encrypted registration");
+  await page.getByRole("button", { name: "Export household data" }).click();
+  await expect(page.getByRole("status")).toContainText("Demo household");
+  await page.getByRole("button", { name: "Delete household registration" }).click();
+  await expect(page.getByRole("status")).toContainText("Registration deleted");
   await page.context().setOffline(true);
   await page.reload();
   await expect(page.getByRole("img", { name: "Synthetic community risk map" })).toBeVisible();

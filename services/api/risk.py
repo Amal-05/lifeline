@@ -11,8 +11,8 @@ from sqlalchemy.orm import Session
 
 from packages.protocol.python.lifeline_protocol import new_ulid
 from services.api.dependencies import get_session
-from services.api.models import HouseholdRegistration, RiskCell, User
-from services.api.privacy import encrypt_registration
+from services.api.models import AuditLog, HouseholdRegistration, RiskCell, User
+from services.api.privacy import decrypt_registration, encrypt_registration
 from services.api.security import require_roles
 
 router = APIRouter(prefix="/api/v1", tags=["risk and preparedness"])
@@ -46,7 +46,7 @@ def risk_index(factors: dict[str, float]) -> int:
 def purge_expired_households(session: Session) -> int:
     result = session.execute(delete(HouseholdRegistration).where(
         HouseholdRegistration.expires_at <= datetime.now(UTC)
-    ))
+    ), execution_options={"synchronize_session": False})
     session.commit()
     return result.rowcount or 0
 
@@ -113,11 +113,43 @@ def register_household(body: HouseholdRegistrationBody, session: SessionDep, use
     encrypted = encrypt_registration(json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode())
     registration = HouseholdRegistration(registration_id=new_ulid(), h3_cell=cell,
                                          encrypted_payload=encrypted,
+                                         registrar_id=user.user_id, consent_at=datetime.now(UTC),
                                          expires_at=datetime.now(UTC) + timedelta(days=365))
     session.add(registration)
     session.commit()
     return {"registration_id": registration.registration_id, "cell_id": cell,
             "status": "encrypted", "expires_at": registration.expires_at.isoformat()}
+
+
+@router.get("/households/{registration_id}/export")
+def export_household(registration_id: str, session: SessionDep, user: Coordinator) -> dict:
+    registration = session.get(HouseholdRegistration, registration_id)
+    if registration is None:
+        raise HTTPException(status_code=404, detail="Household registration not found")
+    try:
+        payload = json.loads(decrypt_registration(registration.encrypted_payload))
+    except ValueError as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+    session.add(AuditLog(log_id=new_ulid(), actor=user.user_id, action="household.exported",
+                         entity="household_registration", entity_id=registration_id,
+                         after_data={"fields": sorted(payload.keys())}))
+    session.commit()
+    return {"registration_id": registration.registration_id, "cell_id": registration.h3_cell,
+            "created_at": registration.created_at.isoformat(), "consent_at": registration.consent_at.isoformat(),
+            "expires_at": registration.expires_at.isoformat(), "data": payload}
+
+
+@router.delete("/households/{registration_id}", status_code=204)
+def delete_household(registration_id: str, session: SessionDep, user: Coordinator) -> None:
+    registration = session.get(HouseholdRegistration, registration_id)
+    if registration is None:
+        raise HTTPException(status_code=404, detail="Household registration not found")
+    cell = registration.h3_cell
+    session.delete(registration)
+    session.add(AuditLog(log_id=new_ulid(), actor=user.user_id, action="household.deleted",
+                         entity="household_registration", entity_id=registration_id,
+                         before_data={"cell_id": cell}))
+    session.commit()
 
 
 @router.get("/households/summary")
@@ -127,3 +159,17 @@ def household_summary(session: SessionDep, _user: Coordinator) -> list[dict[str,
                             .where(HouseholdRegistration.expires_at > datetime.now(UTC))
                             .group_by(HouseholdRegistration.h3_cell)).all()
     return [{"cell_id": cell, "registration_count": count} for cell, count in rows]
+
+
+@router.get("/households/map")
+def household_map(session: SessionDep, _user: Coordinator) -> dict:
+    """Return coarse cell centroids and counts; never expose registry coordinates or PII."""
+    purge_expired_households(session)
+    rows = session.execute(select(HouseholdRegistration.h3_cell, func.count())
+                           .where(HouseholdRegistration.expires_at > datetime.now(UTC))
+                           .group_by(HouseholdRegistration.h3_cell)).all()
+    return {"type": "FeatureCollection", "features": [
+        {"type": "Feature", "geometry": {"type": "Point", "coordinates": [h3.cell_to_latlng(cell)[1], h3.cell_to_latlng(cell)[0]]},
+         "properties": {"cell_id": cell, "registration_count": count, "precision": "H3 resolution 8"}}
+        for cell, count in rows
+    ]}

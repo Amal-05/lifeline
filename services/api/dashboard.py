@@ -595,6 +595,35 @@ def update_assignment(assignment_id: str, body: AssignmentPatch, session: Sessio
     return {"assignment_id": assignment.assignment_id, "status": assignment.status}
 
 
+@router.get("/assignments/mine")
+def my_assignments(session: SessionDep, user: Volunteer) -> list[dict[str, Any]]:
+    if user.role == "volunteer" and not user.team_id:
+        raise HTTPException(status_code=403, detail="Volunteer account has no assigned team")
+    query = select(Assignment).order_by(Assignment.created_at.desc())
+    if user.role == "volunteer":
+        query = query.where(Assignment.team_id == user.team_id)
+    result = []
+    for assignment in session.scalars(query).all():
+        incident = session.get(Incident, assignment.incident_id) if assignment.incident_id else None
+        cluster = session.get(Cluster, assignment.cluster_id) if assignment.cluster_id else None
+        result.append({
+            "assignment_id": assignment.assignment_id,
+            "team_id": assignment.team_id,
+            "incident_id": assignment.incident_id,
+            "cluster_id": assignment.cluster_id,
+            "status": assignment.status,
+            "eta_s": assignment.eta_s,
+            "route": assignment.route_geojson,
+            "location": ([incident.longitude, incident.latitude] if incident and incident.latitude is not None and incident.longitude is not None
+                         else [cluster.centroid_longitude, cluster.centroid_latitude] if cluster else None),
+            "urgency": _effective_score(incident) if incident else cluster.urgency_max if cluster else 0,
+            "people_count": incident.people_count_max if incident else None,
+            "categories": incident.categories if incident else [],
+            "special_needs": incident.special_needs if incident else [],
+        })
+    return result
+
+
 @router.get("/routes")
 def route_preview(
     _user: IncidentReader,

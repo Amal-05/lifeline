@@ -208,5 +208,7 @@ class HouseholdRegistration(Base):
     registration_id: Mapped[str] = mapped_column(String(26), primary_key=True)
     h3_cell: Mapped[str] = mapped_column(String(20), index=True)
     encrypted_payload: Mapped[str] = mapped_column(Text)
+    registrar_id: Mapped[str] = mapped_column(String(26), default="unknown")
+    consent_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)

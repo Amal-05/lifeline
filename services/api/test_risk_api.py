@@ -5,12 +5,16 @@ from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session
 
 from services.api.models import Base, HouseholdRegistration, User
+from services.api.models import AuditLog
 from services.api.risk import (
     HouseholdRegistrationBody,
     RiskLayerImport,
     get_risk_cells,
     import_risk_layer,
     register_household,
+    export_household,
+    delete_household,
+    household_map,
 )
 
 
@@ -40,6 +44,27 @@ def test_registration_persists_ciphertext_and_returns_no_contact_data(risk_sessi
     assert result["status"] == "encrypted"
     assert "Synthetic Person" not in stored.encrypted_payload
     assert "000-000-0000" not in stored.encrypted_payload
+    assert stored.registrar_id == "U" * 26
+    assert stored.consent_at is not None
+    mapped = household_map(risk_session, User(user_id="U" * 26, role="coordinator"))
+    assert mapped["features"][0]["properties"]["registration_count"] == 1
+    assert mapped["features"][0]["properties"]["precision"] == "H3 resolution 8"
+    assert "contact_name" not in str(mapped)
+    exported = export_household(result["registration_id"], risk_session, User(user_id="U" * 26, role="coordinator"))
+    assert exported["data"]["contact_name"] == "Synthetic Person"
+    assert risk_session.scalar(select(AuditLog).where(AuditLog.action == "household.exported")) is not None
+
+
+def test_household_delete_removes_ciphertext_and_audits_without_pii(risk_session):
+    body = HouseholdRegistrationBody(latitude=10, longitude=76, household_size=2,
+        contact_name="Synthetic Person", contact_phone="000-000-0000", consent=True)
+    result = register_household(body, risk_session, User(user_id="U" * 26, role="coordinator"))
+    delete_household(result["registration_id"], risk_session, User(user_id="U" * 26, role="coordinator"))
+    assert risk_session.get(HouseholdRegistration, result["registration_id"]) is None
+    audit = risk_session.scalar(select(AuditLog).where(AuditLog.action == "household.deleted"))
+    assert audit is not None
+    assert "Synthetic Person" not in str(audit.before_data)
+    assert "000-000-0000" not in str(audit.before_data)
 
 
 def test_registration_rejects_missing_consent(risk_session):
